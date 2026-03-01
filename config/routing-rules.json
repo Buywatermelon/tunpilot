@@ -1,0 +1,8 @@
+{
+  "rules": [
+    { "type": "geosite", "value": "category-ads-all", "action": "block" },
+    { "type": "geoip", "value": "CN", "action": "direct" },
+    { "type": "geosite", "value": "cn", "action": "direct" },
+    { "type": "match", "action": "proxy" }
+  ]
+}
