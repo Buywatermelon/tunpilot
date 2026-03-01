@@ -1,0 +1,22 @@
+{
+  "name": "tunpilot",
+  "module": "src/index.ts",
+  "scripts": {
+    "dev": "bun --hot src/index.ts",
+    "start": "bun src/index.ts",
+    "test": "bun test"
+  },
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "hono": "^4",
+    "@hono/mcp": "^0",
+    "@modelcontextprotocol/sdk": "^1"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
