@@ -1,0 +1,33 @@
+name: Sync skills to plugin
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "skills/**"
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sync skills to plugin/skills
+        run: |
+          rsync -a --delete skills/ plugin/skills/
+
+      - name: Check for changes
+        id: diff
+        run: |
+          git diff --quiet plugin/skills/ && echo "changed=false" >> "$GITHUB_OUTPUT" || echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Commit and push
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add plugin/skills/
+          git commit -m "chore: sync skills to plugin directory"
+          git push
