@@ -8,17 +8,22 @@ import {
   deleteSubscription,
   getSubscriptionByToken,
 } from "../../services/subscription";
+import { getAllFormatNames } from "../../services/formats/index";
 
 // 注册订阅管理工具（4 个）：generate_subscription, list_subscriptions, delete_subscription, get_subscription_config
 export function register(server: McpServer, db: Db, baseUrl: string) {
-  server.tool(
+  const formatNames = getAllFormatNames();
+
+  server.registerTool(
     "generate_subscription",
-    "Generate a subscription link for a user",
     {
-      user_id: z.string().describe("User ID"),
-      format: z
-        .string()
-        .describe('Subscription format: "shadowrocket", "singbox", or "clash"'),
+      description: "Generate a subscription link for a user",
+      inputSchema: {
+        user_id: z.string().describe("User ID"),
+        format: z
+          .string()
+          .describe(`Subscription format: ${formatNames.map(n => `"${n}"`).join(", ")}`),
+      },
     },
     async ({ user_id, format }) => {
       const user = getUser(db, user_id);
@@ -47,30 +52,36 @@ export function register(server: McpServer, db: Db, baseUrl: string) {
     }
   );
 
-  server.tool(
+  server.registerTool(
     "list_subscriptions",
-    "List subscriptions for a user",
-    { user_id: z.string().describe("User ID") },
+    {
+      description: "List subscriptions for a user",
+      inputSchema: { user_id: z.string().describe("User ID") },
+    },
     async ({ user_id }) => {
       const subs = listSubscriptions(db, user_id);
       return { content: [{ type: "text", text: JSON.stringify(subs) }] };
     }
   );
 
-  server.tool(
+  server.registerTool(
     "delete_subscription",
-    "Delete/revoke a subscription token",
-    { id: z.string().describe("Subscription ID") },
+    {
+      description: "Delete/revoke a subscription token",
+      inputSchema: { id: z.string().describe("Subscription ID") },
+    },
     async ({ id }) => {
       deleteSubscription(db, id);
       return { content: [{ type: "text", text: JSON.stringify({ deleted: id }) }] };
     }
   );
 
-  server.tool(
+  server.registerTool(
     "get_subscription_config",
-    "Preview subscription config content (for debugging)",
-    { token: z.string().describe("Subscription token") },
+    {
+      description: "Preview subscription config content (for debugging)",
+      inputSchema: { token: z.string().describe("Subscription token") },
+    },
     async ({ token }) => {
       const sub = getSubscriptionByToken(db, token);
 

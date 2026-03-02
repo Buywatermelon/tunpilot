@@ -7,10 +7,12 @@ import { trafficLogs } from "../../db/schema";
 
 // 注册监控工具（2 个）：check_health, get_traffic_stats
 export function register(server: McpServer, db: Db, _baseUrl: string) {
-  server.tool(
+  server.registerTool(
     "check_health",
-    "Check health status of all nodes (pings stats API if configured)",
-    {},
+    {
+      description: "Check health status of all nodes (pings stats API if configured)",
+      inputSchema: {},
+    },
     async () => {
       const nodes = listNodes(db);
       const results = await Promise.all(
@@ -51,14 +53,16 @@ export function register(server: McpServer, db: Db, _baseUrl: string) {
     }
   );
 
-  server.tool(
+  server.registerTool(
     "get_traffic_stats",
-    "Query traffic statistics from local traffic_logs",
     {
-      user_id: z.string().optional().describe("Filter by user ID"),
-      node_id: z.string().optional().describe("Filter by node ID"),
-      from: z.string().optional().describe("Start datetime (inclusive), e.g. 2026-03-01"),
-      to: z.string().optional().describe("End datetime (exclusive), e.g. 2026-04-01"),
+      description: "Query traffic statistics from local traffic_logs",
+      inputSchema: {
+        user_id: z.string().optional().describe("Filter by user ID"),
+        node_id: z.string().optional().describe("Filter by node ID"),
+        from: z.string().optional().describe("Start datetime (inclusive), e.g. 2026-03-01"),
+        to: z.string().optional().describe("End datetime (exclusive), e.g. 2026-04-01"),
+      },
     },
     async ({ user_id, node_id, from, to }) => {
       const conditions = [];

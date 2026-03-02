@@ -2,14 +2,10 @@ import { Hono } from "hono";
 import type { Db } from "../db/index";
 import { authenticate } from "../services/auth";
 import { getUser, getUserNodes } from "../services/user";
-import {
-  getSubscriptionByToken,
-  renderShadowrocket,
-  renderSingbox,
-  renderClash,
-} from "../services/subscription";
+import { getSubscriptionByToken } from "../services/subscription";
+import { getFormat } from "../services/formats/index";
 
-export function createHttpApp(db: Db, _baseUrl: string): Hono {
+export function createHttpApp(db: Db, baseUrl: string): Hono {
   const app = new Hono();
 
   // Hysteria2 节点认证回调
@@ -35,37 +31,21 @@ export function createHttpApp(db: Db, _baseUrl: string): Hono {
   app.get("/sub/:token", (c) => {
     const { token } = c.req.param();
     const sub = getSubscriptionByToken(db, token);
-    if (!sub) {
-      return c.notFound();
-    }
+    if (!sub) return c.notFound();
+
+    const format = getFormat(sub.format);
+    if (!format) return c.notFound();
 
     const user = getUser(db, sub.user_id);
-    if (!user) {
-      return c.notFound();
-    }
+    if (!user) return c.notFound();
 
     const nodes = getUserNodes(db, user.id).filter((n) => n.enabled);
+    const subscriptionUrl = `${baseUrl}/sub/${token}`;
+    const content = format.render(user, nodes, { subscriptionUrl });
 
-    switch (sub.format) {
-      case "shadowrocket": {
-        const body = renderShadowrocket(user, nodes);
-        return new Response(body, {
-          headers: { "Content-Type": "text/plain; charset=utf-8" },
-        });
-      }
-      case "singbox": {
-        const config = renderSingbox(user, nodes);
-        return c.json(config);
-      }
-      case "clash": {
-        const yaml = renderClash(user, nodes);
-        return new Response(yaml, {
-          headers: { "Content-Type": "text/yaml; charset=utf-8" },
-        });
-      }
-      default:
-        return c.notFound();
-    }
+    return new Response(content, {
+      headers: { "Content-Type": format.contentType },
+    });
   });
 
   // 健康检查

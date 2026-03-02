@@ -67,25 +67,6 @@ describe("nodes tools", () => {
     expect(data).toHaveLength(2);
   });
 
-  test("get_node_info returns a single node", async () => {
-    const node = addNode(db, { name: "n1", host: "1.1.1.1", port: 443, protocol: "hysteria2" });
-    const result = await client.callTool({
-      name: "get_node_info",
-      arguments: { id: node.id },
-    });
-    const data = parseResult(result) as { id: string; name: string };
-    expect(data.id).toBe(node.id);
-    expect(data.name).toBe("n1");
-  });
-
-  test("get_node_info returns error for missing node", async () => {
-    const result = await client.callTool({
-      name: "get_node_info",
-      arguments: { id: "nonexistent" },
-    });
-    expect(result.isError).toBe(true);
-  });
-
   test("update_node updates fields", async () => {
     const node = addNode(db, { name: "n1", host: "1.1.1.1", port: 443, protocol: "hysteria2" });
     const result = await client.callTool({
@@ -101,11 +82,9 @@ describe("nodes tools", () => {
     const node = addNode(db, { name: "n1", host: "1.1.1.1", port: 443, protocol: "hysteria2" });
     await client.callTool({ name: "remove_node", arguments: { id: node.id } });
 
-    const result = await client.callTool({
-      name: "get_node_info",
-      arguments: { id: node.id },
-    });
-    expect(result.isError).toBe(true);
+    const result = await client.callTool({ name: "list_nodes", arguments: {} });
+    const data = parseResult(result) as Array<{ id: string }>;
+    expect(data.find(n => n.id === node.id)).toBeUndefined();
   });
 });
 
@@ -261,7 +240,7 @@ describe("monitoring tools", () => {
     expect(data.total_rx).toBe(2000);
   });
 
-  test("get_cert_status returns cert info for nodes", async () => {
+  test("list_nodes includes cert info", async () => {
     addNode(db, {
       name: "n1",
       host: "1.1.1.1",
@@ -271,7 +250,7 @@ describe("monitoring tools", () => {
       cert_path: "/etc/ssl/cert.pem",
     });
 
-    const result = await client.callTool({ name: "get_cert_status", arguments: {} });
+    const result = await client.callTool({ name: "list_nodes", arguments: {} });
     const data = parseResult(result) as Array<{ name: string; cert_expires: string }>;
     expect(data).toHaveLength(1);
     expect(data[0]!.cert_expires).toBe("2027-01-01T00:00:00Z");

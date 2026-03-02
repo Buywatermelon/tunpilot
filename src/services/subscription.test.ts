@@ -7,10 +7,8 @@ import {
   listSubscriptions,
   getSubscriptionByToken,
   getSubscriptionConfig,
-  renderShadowrocket,
-  renderSingbox,
-  renderClash,
 } from "./subscription";
+import { getFormat } from "./formats/index";
 
 describe("订阅服务", () => {
   let db: Db;
@@ -121,12 +119,14 @@ describe("订阅服务", () => {
     });
   });
 
-  // --- renderShadowrocket ---
+  // --- renderShadowrocket (via Format Registry) ---
 
   describe("渲染 Shadowrocket 配置", () => {
+    const format = getFormat("shadowrocket")!;
+
     test("生成 Base64 编码的 hysteria2 URI", () => {
       const { user, nodes } = setupUserWithNodes();
-      const result = renderShadowrocket(user, nodes);
+      const result = format.render(user, nodes);
       const decoded = atob(result);
       const lines = decoded.trim().split("\n");
       expect(lines).toHaveLength(2);
@@ -145,21 +145,22 @@ describe("订阅服务", () => {
         port: 8443,
         protocol: "hysteria2",
       });
-      const result = renderShadowrocket(user, [node]);
+      const result = format.render(user, [node]);
       const decoded = atob(result);
       expect(decoded).toContain("sni=1.2.3.4");
     });
   });
 
-  // --- renderSingbox ---
+  // --- renderSingbox (via Format Registry) ---
 
   describe("渲染 Sing-box 配置", () => {
+    const format = getFormat("singbox")!;
+
     test("生成包含正确 outbounds 的 JSON", () => {
       const { user, nodes } = setupUserWithNodes();
-      const config = renderSingbox(user, nodes);
+      const config = JSON.parse(format.render(user, nodes));
       expect(config.outbounds).toBeDefined();
 
-      // 查找 hysteria2 outbounds
       const hy2Outbounds = config.outbounds.filter(
         (o: any) => o.type === "hysteria2"
       );
@@ -173,7 +174,7 @@ describe("订阅服务", () => {
 
     test("包含 selector 和 auto outbounds", () => {
       const { user, nodes } = setupUserWithNodes();
-      const config = renderSingbox(user, nodes);
+      const config = JSON.parse(format.render(user, nodes));
       const selector = config.outbounds.find((o: any) => o.type === "selector");
       expect(selector).toBeDefined();
       expect(selector.outbounds).toContain("BWG-US");
@@ -185,12 +186,14 @@ describe("订阅服务", () => {
     });
   });
 
-  // --- renderClash ---
+  // --- renderClash (via Format Registry) ---
 
   describe("渲染 Clash 配置", () => {
+    const format = getFormat("clash")!;
+
     test("生成包含代理节点的 YAML", () => {
       const { user, nodes } = setupUserWithNodes();
-      const yaml = renderClash(user, nodes);
+      const yaml = format.render(user, nodes);
       expect(yaml).toContain("proxies:");
       expect(yaml).toContain('name: "BWG-US"');
       expect(yaml).toContain("server: us-node.example.com");
@@ -201,7 +204,7 @@ describe("订阅服务", () => {
 
     test("包含代理组", () => {
       const { user, nodes } = setupUserWithNodes();
-      const yaml = renderClash(user, nodes);
+      const yaml = format.render(user, nodes);
       expect(yaml).toContain("proxy-groups:");
       expect(yaml).toContain("- BWG-US");
       expect(yaml).toContain("- IIJ-JP");
@@ -209,9 +212,87 @@ describe("订阅服务", () => {
 
     test("包含路由规则", () => {
       const { user, nodes } = setupUserWithNodes();
-      const yaml = renderClash(user, nodes);
+      const yaml = format.render(user, nodes);
       expect(yaml).toContain("rules:");
       expect(yaml).toContain("MATCH,Proxy");
+    });
+  });
+
+  // --- renderSurge (via Format Registry) ---
+
+  describe("渲染 Surge 配置", () => {
+    const format = getFormat("surge")!;
+
+    test("生成包含代理节点的完整配置", () => {
+      const { user, nodes } = setupUserWithNodes();
+      const conf = format.render(user, nodes);
+      expect(conf).toContain("[General]");
+      expect(conf).toContain("[Proxy]");
+      expect(conf).toContain("[Proxy Group]");
+      expect(conf).toContain("[Rule]");
+      expect(conf).toContain("BWG-US = hysteria2, us-node.example.com, 443, password=secret123");
+      expect(conf).toContain("IIJ-JP = hysteria2, jp-node.example.com, 443, password=secret123");
+    });
+
+    test("包含 MANAGED-CONFIG 头（当提供 subscriptionUrl 时）", () => {
+      const { user, nodes } = setupUserWithNodes();
+      const conf = format.render(user, nodes, { subscriptionUrl: "https://example.com/sub/token123" });
+      expect(conf).toContain("#!MANAGED-CONFIG https://example.com/sub/token123 interval=86400 strict=false");
+    });
+
+    test("不包含 MANAGED-CONFIG 头（未提供 subscriptionUrl 时）", () => {
+      const { user, nodes } = setupUserWithNodes();
+      const conf = format.render(user, nodes);
+      expect(conf).not.toContain("#!MANAGED-CONFIG");
+    });
+
+    test("insecure 节点添加 skip-cert-verify", () => {
+      const user = createUser(db, { name: "dave", password: "pass" });
+      const node = addNode(db, {
+        name: "Self-Signed",
+        host: "1.2.3.4",
+        port: 443,
+        protocol: "hysteria2",
+        insecure: 1,
+      });
+      const conf = format.render(user, [node]);
+      expect(conf).toContain("skip-cert-verify=true");
+    });
+
+    test("sni 为空时使用 host 作为 fallback", () => {
+      const user = createUser(db, { name: "eve", password: "pass" });
+      const node = addNode(db, {
+        name: "No-SNI",
+        host: "5.6.7.8",
+        port: 8443,
+        protocol: "hysteria2",
+      });
+      const conf = format.render(user, [node]);
+      expect(conf).toContain("sni=5.6.7.8");
+    });
+
+    test("包含代理组和规则", () => {
+      const { user, nodes } = setupUserWithNodes();
+      const conf = format.render(user, nodes);
+      expect(conf).toContain("Proxy = select");
+      expect(conf).toContain("Auto = url-test");
+      expect(conf).toContain("GEOIP,CN,DIRECT");
+      expect(conf).toContain("FINAL,Proxy");
+    });
+  });
+
+  // --- Format Registry ---
+
+  describe("Format Registry", () => {
+    test("所有格式已注册", () => {
+      expect(getFormat("shadowrocket")).toBeDefined();
+      expect(getFormat("singbox")).toBeDefined();
+      expect(getFormat("clash")).toBeDefined();
+      expect(getFormat("surge")).toBeDefined();
+    });
+
+    test("未知格式返回 undefined", () => {
+      expect(getFormat("unknown")).toBeUndefined();
     });
   });
 

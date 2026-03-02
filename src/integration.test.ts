@@ -178,8 +178,8 @@ describe("integration: subscription flow", () => {
     const decoded = atob(srText);
     expect(decoded).toContain("hysteria2://");
     expect(decoded).toContain("mypassword");
-    expect(decoded).toContain("US West");
-    expect(decoded).toContain("JP Tokyo");
+    expect(decoded).toContain("US%20West");
+    expect(decoded).toContain("JP%20Tokyo");
 
     // Sing-box: JSON config with outbounds
     const sbRes = await req(`/sub/${sbSub.token}`);
