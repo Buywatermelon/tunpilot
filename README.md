@@ -23,10 +23,14 @@ Agent-native 代理节点管理服务。通过 MCP (Model Context Protocol) 提�
 **Claude Code：**
 
 ```
-/plugin marketplace add Buywatermelon/tunpilot
-/plugin install tunpilot@tunpilot
-# 重启 Claude Code 以加载插件
+/plugin marketplace add https://github.com/Buywatermelon/tunpilot.git
 ```
+
+```
+/plugin install tunpilot@Buywatermelon-tunpilot
+```
+
+安装后重启 Claude Code 以加载插件。
 
 **OpenClaw：**
 
@@ -207,7 +211,6 @@ skills/
 │   └── SKILL.md
 └── deploying-nodes/              # 部署 Hysteria2 节点
     ├── SKILL.md
-    ├── setup-guide.md
     └── hysteria2-template.md
 ```
 
