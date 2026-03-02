@@ -1,8 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { Database } from "bun:sqlite";
-import { initDatabase } from "../db/index.ts";
-import { createUser, assignNodesToUser } from "./user.ts";
-import { addNode } from "./node.ts";
+import { initDatabase, type Db } from "../db/index";
+import { createUser, assignNodesToUser } from "./user";
+import { addNode } from "./node";
 import {
   generateSubscription,
   listSubscriptions,
@@ -11,19 +10,20 @@ import {
   renderShadowrocket,
   renderSingbox,
   renderClash,
-} from "./subscription.ts";
+} from "./subscription";
 
-describe("subscription service", () => {
-  let db: Database;
+describe("订阅服务", () => {
+  let db: Db;
 
   beforeEach(() => {
     db = initDatabase(":memory:");
   });
 
   afterEach(() => {
-    db?.close();
+    db?.$client?.close();
   });
 
+  // 创建带节点的测试用户
   function setupUserWithNodes() {
     const user = createUser(db, { name: "alice", password: "secret123" });
     const n1 = addNode(db, {
@@ -46,8 +46,8 @@ describe("subscription service", () => {
 
   // --- generateSubscription ---
 
-  describe("generateSubscription", () => {
-    test("creates subscription with UUID token", () => {
+  describe("生成订阅", () => {
+    test("创建带 UUID token 的订阅", () => {
       const { user } = setupUserWithNodes();
       const sub = generateSubscription(db, user.id, "shadowrocket");
       expect(sub.id).toBeDefined();
@@ -57,14 +57,14 @@ describe("subscription service", () => {
       expect(sub.user_id).toBe(user.id);
     });
 
-    test("generates unique tokens", () => {
+    test("生成唯一 token", () => {
       const { user } = setupUserWithNodes();
       const s1 = generateSubscription(db, user.id, "shadowrocket");
       const s2 = generateSubscription(db, user.id, "singbox");
       expect(s1.token).not.toBe(s2.token);
     });
 
-    test("returns url when baseUrl is provided", () => {
+    test("提供 baseUrl 时返回完整链接", () => {
       const { user } = setupUserWithNodes();
       const sub = generateSubscription(
         db,
@@ -77,7 +77,7 @@ describe("subscription service", () => {
       );
     });
 
-    test("url is undefined when baseUrl is not provided", () => {
+    test("未提供 baseUrl 时 url 为 undefined", () => {
       const { user } = setupUserWithNodes();
       const sub = generateSubscription(db, user.id, "shadowrocket");
       expect(sub.url).toBeUndefined();
@@ -86,13 +86,13 @@ describe("subscription service", () => {
 
   // --- listSubscriptions ---
 
-  describe("listSubscriptions", () => {
-    test("returns empty array for user with no subscriptions", () => {
+  describe("列出订阅", () => {
+    test("无订阅时返回空数组", () => {
       const { user } = setupUserWithNodes();
       expect(listSubscriptions(db, user.id)).toEqual([]);
     });
 
-    test("returns all subscriptions for user", () => {
+    test("返回用户的所有订阅", () => {
       const { user } = setupUserWithNodes();
       generateSubscription(db, user.id, "shadowrocket");
       generateSubscription(db, user.id, "singbox");
@@ -107,8 +107,8 @@ describe("subscription service", () => {
 
   // --- getSubscriptionByToken ---
 
-  describe("getSubscriptionByToken", () => {
-    test("returns subscription by token", () => {
+  describe("根据 token 获取订阅", () => {
+    test("根据 token 返回订阅", () => {
       const { user } = setupUserWithNodes();
       const sub = generateSubscription(db, user.id, "shadowrocket");
       const found = getSubscriptionByToken(db, sub.token);
@@ -116,15 +116,15 @@ describe("subscription service", () => {
       expect(found!.id).toBe(sub.id);
     });
 
-    test("returns null for invalid token", () => {
+    test("无效 token 返回 null", () => {
       expect(getSubscriptionByToken(db, "invalid-token")).toBeNull();
     });
   });
 
   // --- renderShadowrocket ---
 
-  describe("renderShadowrocket", () => {
-    test("produces base64-encoded hysteria2 URIs", () => {
+  describe("渲染 Shadowrocket 配置", () => {
+    test("生成 Base64 编码的 hysteria2 URI", () => {
       const { user, nodes } = setupUserWithNodes();
       const result = renderShadowrocket(user, nodes);
       const decoded = atob(result);
@@ -137,7 +137,7 @@ describe("subscription service", () => {
       expect(lines[1]).toContain("#IIJ-JP");
     });
 
-    test("uses host as sni fallback when sni is null", () => {
+    test("sni 为空时使用 host 作为 fallback", () => {
       const user = createUser(db, { name: "bob", password: "pass" });
       const node = addNode(db, {
         name: "HK-Node",
@@ -153,13 +153,13 @@ describe("subscription service", () => {
 
   // --- renderSingbox ---
 
-  describe("renderSingbox", () => {
-    test("produces valid JSON with correct outbounds", () => {
+  describe("渲染 Sing-box 配置", () => {
+    test("生成包含正确 outbounds 的 JSON", () => {
       const { user, nodes } = setupUserWithNodes();
       const config = renderSingbox(user, nodes);
       expect(config.outbounds).toBeDefined();
 
-      // Find hysteria2 outbounds
+      // 查找 hysteria2 outbounds
       const hy2Outbounds = config.outbounds.filter(
         (o: any) => o.type === "hysteria2"
       );
@@ -171,7 +171,7 @@ describe("subscription service", () => {
       expect(hy2Outbounds[0].tls.server_name).toBe("us-node.example.com");
     });
 
-    test("includes selector and auto outbounds", () => {
+    test("包含 selector 和 auto outbounds", () => {
       const { user, nodes } = setupUserWithNodes();
       const config = renderSingbox(user, nodes);
       const selector = config.outbounds.find((o: any) => o.type === "selector");
@@ -187,8 +187,8 @@ describe("subscription service", () => {
 
   // --- renderClash ---
 
-  describe("renderClash", () => {
-    test("produces YAML with proxies", () => {
+  describe("渲染 Clash 配置", () => {
+    test("生成包含代理节点的 YAML", () => {
       const { user, nodes } = setupUserWithNodes();
       const yaml = renderClash(user, nodes);
       expect(yaml).toContain("proxies:");
@@ -199,7 +199,7 @@ describe("subscription service", () => {
       expect(yaml).toContain("sni: us-node.example.com");
     });
 
-    test("includes proxy groups", () => {
+    test("包含代理组", () => {
       const { user, nodes } = setupUserWithNodes();
       const yaml = renderClash(user, nodes);
       expect(yaml).toContain("proxy-groups:");
@@ -207,7 +207,7 @@ describe("subscription service", () => {
       expect(yaml).toContain("- IIJ-JP");
     });
 
-    test("includes rules", () => {
+    test("包含路由规则", () => {
       const { user, nodes } = setupUserWithNodes();
       const yaml = renderClash(user, nodes);
       expect(yaml).toContain("rules:");
@@ -217,18 +217,18 @@ describe("subscription service", () => {
 
   // --- getSubscriptionConfig ---
 
-  describe("getSubscriptionConfig", () => {
-    test("returns shadowrocket config with text/plain content type", () => {
+  describe("获取订阅配置", () => {
+    test("返回 Shadowrocket 配置（text/plain 类型）", () => {
       const { user } = setupUserWithNodes();
       const sub = generateSubscription(db, user.id, "shadowrocket");
       const result = getSubscriptionConfig(db, sub.token);
       expect(result).not.toBeNull();
       expect(result!.contentType).toBe("text/plain; charset=utf-8");
-      // Content should be valid base64
+      // 内容应为有效的 Base64
       expect(() => atob(result!.content)).not.toThrow();
     });
 
-    test("returns singbox config with application/json content type", () => {
+    test("返回 Sing-box 配置（application/json 类型）", () => {
       const { user } = setupUserWithNodes();
       const sub = generateSubscription(db, user.id, "singbox");
       const result = getSubscriptionConfig(db, sub.token);
@@ -238,7 +238,7 @@ describe("subscription service", () => {
       expect(parsed.outbounds).toBeDefined();
     });
 
-    test("returns clash config with text/yaml content type", () => {
+    test("返回 Clash 配置（text/yaml 类型）", () => {
       const { user } = setupUserWithNodes();
       const sub = generateSubscription(db, user.id, "clash");
       const result = getSubscriptionConfig(db, sub.token);
@@ -247,12 +247,12 @@ describe("subscription service", () => {
       expect(result!.content).toContain("proxies:");
     });
 
-    test("returns null for invalid token", () => {
+    test("无效 token 返回 null", () => {
       const result = getSubscriptionConfig(db, "nonexistent-token");
       expect(result).toBeNull();
     });
 
-    test("only includes enabled nodes", () => {
+    test("仅包含已启用的节点", () => {
       const user = createUser(db, { name: "charlie", password: "pass" });
       const n1 = addNode(db, {
         name: "Enabled-Node",

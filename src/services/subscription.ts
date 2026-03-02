@@ -1,58 +1,10 @@
-import type { Database } from "bun:sqlite";
-import type { User } from "./user.ts";
-import type { Node } from "./node.ts";
-import { getUser, getUserNodes } from "./user.ts";
-
-export interface Subscription {
-  id: string;
-  user_id: string;
-  token: string;
-  format: string;
-  created_at: string;
-}
+import { eq } from "drizzle-orm";
+import type { Db } from "../db/index";
+import { subscriptions, type Subscription, type User, type Node } from "../db/schema";
+import { getUser, getUserNodes } from "./user";
 
 export interface SubscriptionWithUrl extends Subscription {
   url?: string;
-}
-
-export function generateSubscription(
-  db: Database,
-  userId: string,
-  format: string,
-  baseUrl?: string
-): SubscriptionWithUrl {
-  const id = crypto.randomUUID();
-  const token = crypto.randomUUID();
-  db.prepare(
-    "INSERT INTO subscriptions (id, user_id, token, format) VALUES (?, ?, ?, ?)"
-  ).run(id, userId, token, format);
-  const sub = db
-    .query("SELECT * FROM subscriptions WHERE id = ?")
-    .get(id) as SubscriptionWithUrl;
-  if (baseUrl) {
-    sub.url = `${baseUrl}/sub/${token}`;
-  }
-  return sub;
-}
-
-export function listSubscriptions(
-  db: Database,
-  userId: string
-): Subscription[] {
-  return db
-    .query("SELECT * FROM subscriptions WHERE user_id = ?")
-    .all(userId) as Subscription[];
-}
-
-export function getSubscriptionByToken(
-  db: Database,
-  token: string
-): Subscription | null {
-  return (
-    (db
-      .query("SELECT * FROM subscriptions WHERE token = ?")
-      .get(token) as Subscription) ?? null
-  );
 }
 
 export interface SubscriptionConfig {
@@ -60,8 +12,48 @@ export interface SubscriptionConfig {
   contentType: string;
 }
 
+// 生成订阅链接
+export function generateSubscription(
+  db: Db,
+  userId: string,
+  format: string,
+  baseUrl?: string
+): SubscriptionWithUrl {
+  const sub = db
+    .insert(subscriptions)
+    .values({ user_id: userId, format })
+    .returning()
+    .get() as SubscriptionWithUrl;
+
+  if (baseUrl) {
+    sub.url = `${baseUrl}/sub/${sub.token}`;
+  }
+  return sub;
+}
+
+// 列出用户的所有订阅
+export function listSubscriptions(db: Db, userId: string): Subscription[] {
+  return db
+    .select()
+    .from(subscriptions)
+    .where(eq(subscriptions.user_id, userId))
+    .all();
+}
+
+// 根据 token 获取订阅
+export function getSubscriptionByToken(db: Db, token: string): Subscription | null {
+  return (
+    db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.token, token))
+      .get() ?? null
+  );
+}
+
+// 获取订阅配置内容（根据格式渲染）
 export function getSubscriptionConfig(
-  db: Database,
+  db: Db,
   token: string
 ): SubscriptionConfig | null {
   const sub = getSubscriptionByToken(db, token);
@@ -93,6 +85,8 @@ export function getSubscriptionConfig(
   }
 }
 
+// --- 渲染函数（纯函数，不涉及 DB 操作） ---
+
 function buildHy2Uri(
   password: string,
   host: string,
@@ -104,6 +98,7 @@ function buildHy2Uri(
   return `hysteria2://${password}@${host}:${port}/?sni=${serverName}&insecure=0#${name}`;
 }
 
+// 渲染 Shadowrocket 格式（Base64 编码的 URI 列表）
 export function renderShadowrocket(user: User, nodes: Node[]): string {
   const lines = nodes.map((n) =>
     buildHy2Uri(user.password, n.host, n.port, n.sni, n.name)
@@ -111,6 +106,7 @@ export function renderShadowrocket(user: User, nodes: Node[]): string {
   return btoa(lines.join("\n"));
 }
 
+// 渲染 Sing-box JSON 配置
 export function renderSingbox(user: User, nodes: Node[]): any {
   const nodeNames = nodes.map((n) => n.name);
 
@@ -174,6 +170,7 @@ export function renderSingbox(user: User, nodes: Node[]): any {
   };
 }
 
+// 渲染 Clash YAML 配置
 export function renderClash(user: User, nodes: Node[]): string {
   const proxies = nodes
     .map((n) => {
@@ -231,3 +228,5 @@ rules:
   - MATCH,Proxy
 `;
 }
+
+export type { Subscription } from "../db/schema";
