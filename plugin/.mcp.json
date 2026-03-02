@@ -1,9 +1,0 @@
-{
-  "tunpilot": {
-    "type": "http",
-    "url": "${TUNPILOT_URL}/mcp",
-    "headers": {
-      "Authorization": "Bearer ${TUNPILOT_MCP_TOKEN}"
-    }
-  }
-}
