@@ -1,0 +1,8 @@
+{
+  "name": "tunpilot",
+  "description": "Agent-native proxy node management with Hysteria2 deployment guides",
+  "version": "0.1.0",
+  "homepage": "https://github.com/user/tunpilot",
+  "license": "MIT",
+  "keywords": ["proxy", "hysteria2", "vpn", "mcp"]
+}
