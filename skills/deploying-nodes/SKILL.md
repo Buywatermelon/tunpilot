@@ -15,7 +15,7 @@ metadata:
 
 Deploy a production-grade Hysteria2 proxy node with automatic performance tuning, security hardening, and censorship resistance. Follow each phase in order.
 
-**Prerequisite**: TunPilot server must be running and MCP connected.
+**Prerequisite**: TunPilot server must be running and MCP must be connected (use `getting-started` skill if not).
 
 ---
 
@@ -82,8 +82,8 @@ Using the probe results, build a server profile table:
 
 | Parameter | Source | Derived Setting |
 |-----------|--------|-----------------|
-| Memory | `free -b` | QUIC receive/send window size (e.g. 8MB for 1GB RAM, 16MB for 2GB+) |
-| CPU cores | `nproc` | maxStreams (cores x 256, cap at 2048) |
+| Memory | `free -b` | QUIC receive/send window size (Memory < 4 GB: 8 MB windows, Memory >= 4 GB: 16 MB windows) |
+| CPU cores | `nproc` | maxStreams (cores x 256, cap at 1024) |
 | Port conflicts | `ss -tulnp` | Whether to use alternative ports |
 | Firewall type | probe | Which firewall commands to use (ufw/firewall-cmd/iptables/none) |
 | Kernel tuning | sysctl values | Whether sysctl tuning is needed |
@@ -96,7 +96,7 @@ Present the server profile and confirm:
 - **Congestion control**: Brutal (recommended for dedicated bandwidth) vs BBR (for shared/variable bandwidth)
 - **Port hopping**: Whether to enable UDP port hopping (20000-50000 DNAT to 443) for censorship resistance
 - **Bandwidth limits**: Up/down values based on server specs
-- **Masquerade site**: Default `https://news.ycombinator.com` or custom
+- **Masquerade site**: Default `https://www.bing.com` or custom
 
 ---
 
@@ -224,6 +224,8 @@ cat > /etc/systemd/system/hysteria-server.service.d/hardening.conf << 'EOF'
 [Service]
 LimitNOFILE=65536
 NoNewPrivileges=true
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
 ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=/etc/hysteria
@@ -299,14 +301,14 @@ Only if a domain was configured — verify the masquerade proxy is working:
 curl -I https://<domain>
 ```
 
-The response should show headers from the masquerade target (e.g. Hacker News).
+The response should show headers from the masquerade target (e.g. Bing).
 
 ### 3.3 Stats API Test
 
 Test the traffic stats API from the node itself via SSH:
 
 ```bash
-ssh <server> "curl -s http://127.0.0.1:9999/online"
+ssh <server> "curl -s -H 'Authorization: <stats_secret>' http://127.0.0.1:9999/online"
 ```
 
 This should return a JSON response with online user count.
