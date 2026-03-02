@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, primaryKey } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, primaryKey, index } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
 // 代理节点表
@@ -18,6 +18,7 @@ export const nodes = sqliteTable("nodes", {
   config_path: text("config_path"),
   ssh_user: text("ssh_user"),
   ssh_port: integer("ssh_port").default(22),
+  insecure: integer("insecure").default(0),
   enabled: integer("enabled").default(1),
   created_at: text("created_at").default(sql`(datetime('now'))`),
 });
@@ -33,7 +34,9 @@ export const users = sqliteTable("users", {
   max_devices: integer("max_devices").default(3),
   enabled: integer("enabled").default(1),
   created_at: text("created_at").default(sql`(datetime('now'))`),
-});
+}, (table) => [
+  index("idx_users_password").on(table.password),
+]);
 
 // 用户-节点关联表
 export const userNodes = sqliteTable("user_nodes", {
@@ -60,7 +63,10 @@ export const trafficLogs = sqliteTable("traffic_logs", {
   tx_bytes: integer("tx_bytes").default(0),
   rx_bytes: integer("rx_bytes").default(0),
   recorded_at: text("recorded_at").default(sql`(datetime('now'))`),
-});
+}, (table) => [
+  index("idx_traffic_logs_recorded_at").on(table.recorded_at),
+  index("idx_traffic_logs_user_node").on(table.user_id, table.node_id),
+]);
 
 // 从 schema 推导的类型
 export type Node = typeof nodes.$inferSelect;

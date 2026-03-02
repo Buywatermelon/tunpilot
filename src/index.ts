@@ -82,10 +82,12 @@ console.log(`  MCP endpoint: /mcp`);
 console.log(`  Traffic sync interval: ${config.trafficSyncInterval / 1000}s`);
 
 // 优雅关闭
-process.on("SIGINT", () => {
+function shutdown() {
   console.log("Shutting down...");
   clearInterval(syncTimer);
   server.stop();
   db.$client.close();
   process.exit(0);
-});
+}
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);

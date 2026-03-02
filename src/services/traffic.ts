@@ -84,7 +84,7 @@ export async function syncTrafficFromNode(
   return result;
 }
 
-// 同步所有已启用且配置了 stats_port 的节点
+// 同步所有已启用且配置了 stats_port 的节点（并行）
 export async function syncAllNodes(db: Db): Promise<SyncResult[]> {
   const enabledNodes = db
     .select()
@@ -92,12 +92,15 @@ export async function syncAllNodes(db: Db): Promise<SyncResult[]> {
     .where(and(eq(nodes.enabled, 1), isNotNull(nodes.stats_port)))
     .all();
 
-  const results: SyncResult[] = [];
-  for (const node of enabledNodes) {
-    const result = await syncTrafficFromNode(db, node);
-    results.push(result);
-  }
-  return results;
+  const settled = await Promise.allSettled(
+    enabledNodes.map((node) => syncTrafficFromNode(db, node))
+  );
+
+  return settled.map((r, i) =>
+    r.status === "fulfilled"
+      ? r.value
+      : { nodeId: enabledNodes[i]!.id, synced: 0, errors: [String(r.reason)] }
+  );
 }
 
 // 查询流量统计（支持多维度筛选）

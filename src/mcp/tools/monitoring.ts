@@ -9,18 +9,41 @@ import { trafficLogs } from "../../db/schema";
 export function register(server: McpServer, db: Db, _baseUrl: string) {
   server.tool(
     "check_health",
-    "Check health status of all nodes",
+    "Check health status of all nodes (pings stats API if configured)",
     {},
     async () => {
       const nodes = listNodes(db);
-      const results = nodes.map((node) => ({
-        id: node.id,
-        name: node.name,
-        host: node.host,
-        port: node.port,
-        enabled: node.enabled,
-        status: node.enabled ? "registered" : "disabled",
-      }));
+      const results = await Promise.all(
+        nodes.map(async (node) => {
+          const base = {
+            id: node.id,
+            name: node.name,
+            host: node.host,
+            port: node.port,
+            enabled: node.enabled,
+          };
+
+          if (!node.enabled) return { ...base, status: "disabled" as const };
+
+          // 如果配置了 stats_port，实际 ping 节点
+          if (node.stats_port && node.stats_secret) {
+            try {
+              const res = await fetch(
+                `http://${node.host}:${node.stats_port}/traffic`,
+                {
+                  headers: { Authorization: node.stats_secret },
+                  signal: AbortSignal.timeout(5000),
+                }
+              );
+              return { ...base, status: res.ok ? "online" as const : `error_${res.status}` };
+            } catch {
+              return { ...base, status: "unreachable" as const };
+            }
+          }
+
+          return { ...base, status: "registered" as const };
+        })
+      );
 
       return {
         content: [{ type: "text", text: JSON.stringify({ nodes: results }) }],

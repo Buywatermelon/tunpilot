@@ -92,16 +92,18 @@ function buildHy2Uri(
   host: string,
   port: number,
   sni: string | null,
+  insecure: number | null,
   name: string
 ): string {
   const serverName = sni || host;
-  return `hysteria2://${password}@${host}:${port}/?sni=${serverName}&insecure=0#${name}`;
+  const insecureFlag = insecure ? 1 : 0;
+  return `hysteria2://${password}@${host}:${port}/?sni=${serverName}&insecure=${insecureFlag}#${name}`;
 }
 
 // 渲染 Shadowrocket 格式（Base64 编码的 URI 列表）
 export function renderShadowrocket(user: User, nodes: Node[]): string {
   const lines = nodes.map((n) =>
-    buildHy2Uri(user.password, n.host, n.port, n.sni, n.name)
+    buildHy2Uri(user.password, n.host, n.port, n.sni, n.insecure, n.name)
   );
   return btoa(lines.join("\n"));
 }
@@ -119,6 +121,7 @@ export function renderSingbox(user: User, nodes: Node[]): any {
     tls: {
       enabled: true,
       server_name: n.sni || n.host,
+      ...(n.insecure ? { insecure: true } : {}),
     },
   }));
 
@@ -175,12 +178,14 @@ export function renderClash(user: User, nodes: Node[]): string {
   const proxies = nodes
     .map((n) => {
       const sni = n.sni || n.host;
-      return `  - name: "${n.name}"
+      let entry = `  - name: "${n.name}"
     type: hysteria2
     server: ${n.host}
     port: ${n.port}
     password: "${user.password}"
     sni: ${sni}`;
+      if (n.insecure) entry += `\n    skip-cert-verify: true`;
+      return entry;
     })
     .join("\n\n");
 

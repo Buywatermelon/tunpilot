@@ -8,6 +8,8 @@ import {
   updateUser,
   deleteUser,
   resetTraffic,
+  assignNodesToUser,
+  getUserNodes,
 } from "../../services/user";
 
 // 注册用户管理工具（5 个）：list_users, create_user, update_user, delete_user, reset_traffic
@@ -79,6 +81,41 @@ export function register(server: McpServer, db: Db, _baseUrl: string) {
     async ({ id }) => {
       resetTraffic(db, id);
       return { content: [{ type: "text", text: JSON.stringify({ success: true }) }] };
+    }
+  );
+
+  server.tool(
+    "assign_nodes",
+    "Assign nodes to a user (replaces existing assignments). Required for user to connect via those nodes.",
+    {
+      user_id: z.string().describe("User ID"),
+      node_ids: z.array(z.string()).describe("List of node IDs to assign"),
+    },
+    async ({ user_id, node_ids }) => {
+      const user = getUser(db, user_id);
+      if (!user) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: JSON.stringify({ error: "User not found" }) }],
+        };
+      }
+      assignNodesToUser(db, user_id, node_ids);
+      const assigned = getUserNodes(db, user_id);
+      return {
+        content: [{ type: "text", text: JSON.stringify({ user_id, nodes: assigned.map(n => ({ id: n.id, name: n.name })) }) }],
+      };
+    }
+  );
+
+  server.tool(
+    "list_user_nodes",
+    "List nodes assigned to a user",
+    { user_id: z.string().describe("User ID") },
+    async ({ user_id }) => {
+      const nodes = getUserNodes(db, user_id);
+      return {
+        content: [{ type: "text", text: JSON.stringify(nodes.map(n => ({ id: n.id, name: n.name, host: n.host, port: n.port, enabled: n.enabled }))) }],
+      };
     }
   );
 }

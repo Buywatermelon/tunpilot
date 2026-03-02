@@ -48,6 +48,7 @@ export function register(server: McpServer, db: Db, baseUrl: string) {
       config_path: z.string().optional().describe("Config file path on node"),
       ssh_user: z.string().optional().describe("SSH username for node ops"),
       ssh_port: z.number().optional().describe("SSH port"),
+      insecure: z.number().optional().describe("1 = self-signed cert (skip verification), 0 = valid cert"),
     },
     async (args) => {
       const node = addNode(db, args);
@@ -76,6 +77,7 @@ export function register(server: McpServer, db: Db, baseUrl: string) {
       config_path: z.string().optional().describe("Config path"),
       ssh_user: z.string().optional().describe("SSH username"),
       ssh_port: z.number().optional().describe("SSH port"),
+      insecure: z.number().optional().describe("1 = self-signed cert, 0 = valid cert"),
       enabled: z.number().optional().describe("1 = enabled, 0 = disabled"),
     },
     async ({ id, ...updates }) => {

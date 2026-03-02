@@ -31,6 +31,7 @@ export function initDatabase(path: string): Db {
       config_path   TEXT,
       ssh_user      TEXT,
       ssh_port      INTEGER DEFAULT 22,
+      insecure      INTEGER DEFAULT 0,
       enabled       INTEGER DEFAULT 1,
       created_at    TEXT DEFAULT (datetime('now'))
     )
@@ -78,6 +79,14 @@ export function initDatabase(path: string): Db {
       recorded_at   TEXT DEFAULT (datetime('now'))
     )
   `);
+
+  // 索引
+  sqlite.run(`CREATE INDEX IF NOT EXISTS idx_users_password ON users(password)`);
+  sqlite.run(`CREATE INDEX IF NOT EXISTS idx_traffic_logs_recorded_at ON traffic_logs(recorded_at)`);
+  sqlite.run(`CREATE INDEX IF NOT EXISTS idx_traffic_logs_user_node ON traffic_logs(user_id, node_id)`);
+
+  // 在线迁移：为已有数据库添加新列
+  try { sqlite.run(`ALTER TABLE nodes ADD COLUMN insecure INTEGER DEFAULT 0`); } catch {}
 
   return drizzle(sqlite, { schema });
 }
