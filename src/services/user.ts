@@ -27,9 +27,12 @@ export function getUser(db: Db, id: string): User | null {
 }
 
 // 更新用户（部分更新）
-export function updateUser(db: Db, id: string, updates: UpdateUserParams): void {
-  if (Object.keys(updates).length === 0) return;
+export function updateUser(db: Db, id: string, updates: UpdateUserParams): User | null {
+  const existing = getUser(db, id);
+  if (!existing) return null;
+  if (Object.keys(updates).length === 0) return existing;
   db.update(users).set(updates).where(eq(users.id, id)).run();
+  return getUser(db, id);
 }
 
 // 删除用户（级联删除关联数据）

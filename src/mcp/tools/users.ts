@@ -12,7 +12,7 @@ import {
   getUserNodes,
 } from "../../services/user";
 
-// 注册用户管理工具（5 个）：list_users, create_user, update_user, delete_user, reset_traffic
+// 注册用户管理工具（7 个）：list_users, create_user, update_user, delete_user, reset_traffic, assign_nodes, list_user_nodes
 export function register(server: McpServer, db: Db, _baseUrl: string) {
   server.tool(
     "list_users",
@@ -52,8 +52,7 @@ export function register(server: McpServer, db: Db, _baseUrl: string) {
       enabled: z.number().optional().describe("1 = enabled, 0 = disabled"),
     },
     async ({ id, ...updates }) => {
-      updateUser(db, id, updates);
-      const user = getUser(db, id);
+      const user = updateUser(db, id, updates);
       if (!user) {
         return {
           isError: true,

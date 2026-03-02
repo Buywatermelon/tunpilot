@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, primaryKey, index } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, primaryKey, index, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
 // 代理节点表
@@ -35,7 +35,7 @@ export const users = sqliteTable("users", {
   enabled: integer("enabled").default(1),
   created_at: text("created_at").default(sql`(datetime('now'))`),
 }, (table) => [
-  index("idx_users_password").on(table.password),
+  uniqueIndex("idx_users_password").on(table.password),
 ]);
 
 // 用户-节点关联表

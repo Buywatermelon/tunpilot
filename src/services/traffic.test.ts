@@ -76,7 +76,7 @@ describe("syncTrafficFromNode", () => {
   test("处理单次响应中的多个用户", async () => {
     const node = createNodeWithStats();
     const alice = createUser(db, { name: "alice", password: "pass" });
-    const bob = createUser(db, { name: "bob", password: "pass" });
+    const bob = createUser(db, { name: "bob", password: "pass-bob" });
 
     globalThis.fetch = (async () => {
       return new Response(
@@ -277,7 +277,7 @@ describe("getTrafficStats", () => {
   test("无筛选条件时返回所有流量日志", () => {
     const node = createNodeWithStats();
     const alice = createUser(db, { name: "alice", password: "pass" });
-    const bob = createUser(db, { name: "bob", password: "pass" });
+    const bob = createUser(db, { name: "bob", password: "pass-bob" });
 
     db.$client.run(
       "INSERT INTO traffic_logs (user_id, node_id, tx_bytes, rx_bytes) VALUES (?, ?, ?, ?)",
@@ -300,7 +300,7 @@ describe("getTrafficStats", () => {
   test("按 userId 筛选", () => {
     const node = createNodeWithStats();
     const alice = createUser(db, { name: "alice", password: "pass" });
-    const bob = createUser(db, { name: "bob", password: "pass" });
+    const bob = createUser(db, { name: "bob", password: "pass-bob" });
 
     db.$client.run(
       "INSERT INTO traffic_logs (user_id, node_id, tx_bytes, rx_bytes) VALUES (?, ?, ?, ?)",
@@ -372,7 +372,7 @@ describe("getTrafficStats", () => {
     const node1 = createNodeWithStats({ name: "node-1", host: "1.1.1.1" });
     const node2 = createNodeWithStats({ name: "node-2", host: "2.2.2.2" });
     const alice = createUser(db, { name: "alice", password: "pass" });
-    const bob = createUser(db, { name: "bob", password: "pass" });
+    const bob = createUser(db, { name: "bob", password: "pass-bob" });
 
     db.$client.run(
       "INSERT INTO traffic_logs (user_id, node_id, tx_bytes, rx_bytes, recorded_at) VALUES (?, ?, ?, ?, ?)",

@@ -5,7 +5,7 @@ import { listNodes } from "../../services/node";
 import { eq, and, gte, lt, sql } from "drizzle-orm";
 import { trafficLogs } from "../../db/schema";
 
-// 注册监控工具（3 个）：check_health, get_traffic_stats, get_cert_status
+// 注册监控工具（2 个）：check_health, get_traffic_stats
 export function register(server: McpServer, db: Db, _baseUrl: string) {
   server.tool(
     "check_health",
@@ -92,20 +92,4 @@ export function register(server: McpServer, db: Db, _baseUrl: string) {
     }
   );
 
-  server.tool(
-    "get_cert_status",
-    "Get certificate expiry status for all nodes",
-    {},
-    async () => {
-      const certs = listNodes(db).map((node) => ({
-        id: node.id,
-        name: node.name,
-        host: node.host,
-        cert_path: node.cert_path,
-        cert_expires: node.cert_expires,
-        enabled: node.enabled,
-      }));
-      return { content: [{ type: "text", text: JSON.stringify(certs) }] };
-    }
-  );
 }

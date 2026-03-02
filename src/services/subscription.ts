@@ -40,6 +40,11 @@ export function listSubscriptions(db: Db, userId: string): Subscription[] {
     .all();
 }
 
+// 删除订阅（撤销 token）
+export function deleteSubscription(db: Db, id: string): void {
+  db.delete(subscriptions).where(eq(subscriptions.id, id)).run();
+}
+
 // 根据 token 获取订阅
 export function getSubscriptionByToken(db: Db, token: string): Subscription | null {
   return (
@@ -132,7 +137,7 @@ export function renderSingbox(user: User, nodes: Node[]): any {
         { tag: "google", address: "https://dns.google/dns-query" },
         { tag: "local", address: "223.5.5.5", detour: "direct" },
       ],
-      rules: [{ geosite: "cn", server: "local" }],
+      rules: [{ rule_set: "geosite-cn", server: "local" }],
     },
     inbounds: [
       {
@@ -165,8 +170,31 @@ export function renderSingbox(user: User, nodes: Node[]): any {
     route: {
       rules: [
         { protocol: "dns", outbound: "dns-out" },
-        { geosite: "cn", geoip: "cn", outbound: "direct" },
-        { geosite: "category-ads-all", outbound: "block" },
+        { rule_set: ["geosite-cn", "geoip-cn"], outbound: "direct" },
+        { rule_set: ["geosite-category-ads-all"], outbound: "block" },
+      ],
+      rule_set: [
+        {
+          type: "remote",
+          tag: "geosite-cn",
+          format: "binary",
+          url: "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs",
+          download_detour: "direct",
+        },
+        {
+          type: "remote",
+          tag: "geoip-cn",
+          format: "binary",
+          url: "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs",
+          download_detour: "direct",
+        },
+        {
+          type: "remote",
+          tag: "geosite-category-ads-all",
+          format: "binary",
+          url: "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs",
+          download_detour: "direct",
+        },
       ],
       auto_detect_interface: true,
     },

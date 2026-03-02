@@ -3,7 +3,7 @@ import { getConfig } from "./config.ts";
 import { initDatabase } from "./db/index.ts";
 import { createHttpApp } from "./http/index.ts";
 import { createMcpServer } from "./mcp/index.ts";
-import { startTrafficSync } from "./services/traffic.ts";
+import { startTrafficSync, cleanupOldTrafficLogs } from "./services/traffic.ts";
 import {
   StreamableHTTPTransport,
   bearerAuth,
@@ -33,22 +33,28 @@ if (config.mcpAuthToken) {
   app.use("/mcp", bearerAuth({ token: config.mcpAuthToken }));
 }
 
-// MCP 会话管理：每个客户端连接独立的 McpServer + Transport
-const sessions = new Map<string, StreamableHTTPTransport>();
+// MCP 会话管理：每个客户端连接独立的 McpServer + Transport（带 TTL）
+interface ManagedSession {
+  transport: StreamableHTTPTransport;
+  lastAccess: number;
+}
+const SESSION_TTL = 30 * 60 * 1000; // 30 分钟无活动自动清理
+const sessions = new Map<string, ManagedSession>();
 
 app.all("/mcp", async (c) => {
   const sessionId = c.req.header("mcp-session-id");
 
   // 已有会话：路由到对应 transport
   if (sessionId) {
-    const transport = sessions.get(sessionId);
-    if (!transport) {
+    const session = sessions.get(sessionId);
+    if (!session) {
       return c.json(
         { jsonrpc: "2.0", error: { code: -32000, message: "Session not found" }, id: null },
         404,
       );
     }
-    return transport.handleRequest(c);
+    session.lastAccess = Date.now();
+    return session.transport.handleRequest(c);
   }
 
   // 新连接：创建独立的 McpServer + Transport
@@ -56,7 +62,7 @@ app.all("/mcp", async (c) => {
   const transport = new StreamableHTTPTransport({
     sessionIdGenerator: () => crypto.randomUUID(),
     onsessioninitialized: (id: string) => {
-      sessions.set(id, transport);
+      sessions.set(id, { transport, lastAccess: Date.now() });
     },
     onsessionclosed: (id: string) => {
       sessions.delete(id);
@@ -66,8 +72,22 @@ app.all("/mcp", async (c) => {
   return transport.handleRequest(c);
 });
 
+// 定期清理过期 MCP 会话
+const sessionCleanup = setInterval(() => {
+  const now = Date.now();
+  for (const [id, session] of sessions) {
+    if (now - session.lastAccess > SESSION_TTL) {
+      sessions.delete(id);
+    }
+  }
+}, 60_000);
+
 // 启动流量同步
 const syncTimer = startTrafficSync(db, config.trafficSyncInterval);
+
+// 启动流量日志清理（每天一次，保留 90 天）
+cleanupOldTrafficLogs(db);
+const retentionTimer = setInterval(() => cleanupOldTrafficLogs(db), 24 * 60 * 60 * 1000);
 
 // 启动服务器
 const server = Bun.serve({
@@ -85,6 +105,8 @@ console.log(`  Traffic sync interval: ${config.trafficSyncInterval / 1000}s`);
 function shutdown() {
   console.log("Shutting down...");
   clearInterval(syncTimer);
+  clearInterval(retentionTimer);
+  clearInterval(sessionCleanup);
   server.stop();
   db.$client.close();
   process.exit(0);

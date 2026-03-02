@@ -1,9 +1,9 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Db } from "../../db/index";
-import { addNode, listNodes, getNode, updateNode, removeNode } from "../../services/node";
+import { addNode, listNodes, updateNode, removeNode } from "../../services/node";
 
-// 注册节点管理工具（5 个）：list_nodes, get_node_info, add_node, update_node, remove_node
+// 注册节点管理工具（4 个）：list_nodes, add_node, update_node, remove_node
 export function register(server: McpServer, db: Db, baseUrl: string) {
   server.tool(
     "list_nodes",
@@ -12,22 +12,6 @@ export function register(server: McpServer, db: Db, baseUrl: string) {
     async () => {
       const nodes = listNodes(db);
       return { content: [{ type: "text", text: JSON.stringify(nodes) }] };
-    }
-  );
-
-  server.tool(
-    "get_node_info",
-    "Get detailed info for a single node",
-    { id: z.string().describe("Node ID") },
-    async ({ id }) => {
-      const node = getNode(db, id);
-      if (!node) {
-        return {
-          isError: true,
-          content: [{ type: "text", text: JSON.stringify({ error: "Node not found" }) }],
-        };
-      }
-      return { content: [{ type: "text", text: JSON.stringify(node) }] };
     }
   );
 

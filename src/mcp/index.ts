@@ -5,7 +5,7 @@ import { register as registerUsers } from "./tools/users";
 import { register as registerSubscriptions } from "./tools/subscriptions";
 import { register as registerMonitoring } from "./tools/monitoring";
 
-// 创建 MCP 服务器并注册所有工具组（共 16 个工具）
+// 创建 MCP 服务器并注册所有工具组（共 19 个工具）
 export function createMcpServer(db: Db, baseUrl: string): McpServer {
   const server = new McpServer({
     name: "tunpilot",

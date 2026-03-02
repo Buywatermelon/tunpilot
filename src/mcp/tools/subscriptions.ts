@@ -5,10 +5,11 @@ import { getUser, getUserNodes } from "../../services/user";
 import {
   generateSubscription,
   listSubscriptions,
+  deleteSubscription,
   getSubscriptionByToken,
 } from "../../services/subscription";
 
-// 注册订阅管理工具（3 个）：generate_subscription, list_subscriptions, get_subscription_config
+// 注册订阅管理工具（4 个）：generate_subscription, list_subscriptions, delete_subscription, get_subscription_config
 export function register(server: McpServer, db: Db, baseUrl: string) {
   server.tool(
     "generate_subscription",
@@ -53,6 +54,16 @@ export function register(server: McpServer, db: Db, baseUrl: string) {
     async ({ user_id }) => {
       const subs = listSubscriptions(db, user_id);
       return { content: [{ type: "text", text: JSON.stringify(subs) }] };
+    }
+  );
+
+  server.tool(
+    "delete_subscription",
+    "Delete/revoke a subscription token",
+    { id: z.string().describe("Subscription ID") },
+    async ({ id }) => {
+      deleteSubscription(db, id);
+      return { content: [{ type: "text", text: JSON.stringify({ deleted: id }) }] };
     }
   );
 

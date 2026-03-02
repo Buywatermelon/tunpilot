@@ -46,39 +46,49 @@ export async function syncTrafficFromNode(
     return result;
   }
 
-  for (const [username, traffic] of Object.entries(data)) {
-    const totalBytes = traffic.tx + traffic.rx;
-    if (totalBytes === 0) continue;
+  // 事务包裹所有 DB 写入：要么全部成功，要么全部回滚
+  // 因为 clear=1 已清除节点数据，失败时记录原始数据供手动恢复
+  try {
+    db.$client.run("BEGIN");
 
-    // 根据用户名查找用户
-    const user = db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.name, username))
-      .get();
+    for (const [username, traffic] of Object.entries(data)) {
+      const totalBytes = traffic.tx + traffic.rx;
+      if (totalBytes === 0) continue;
 
-    if (!user) {
-      result.errors.push(`Unknown user: ${username}`);
-      continue;
+      const user = db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.name, username))
+        .get();
+
+      if (!user) {
+        result.errors.push(`Unknown user: ${username}`);
+        continue;
+      }
+
+      db.insert(trafficLogs)
+        .values({
+          user_id: user.id,
+          node_id: node.id,
+          tx_bytes: traffic.tx,
+          rx_bytes: traffic.rx,
+        })
+        .run();
+
+      db.update(users)
+        .set({ used_bytes: sql`used_bytes + ${totalBytes}` })
+        .where(eq(users.id, user.id))
+        .run();
+
+      result.synced++;
     }
 
-    // 写入流量日志
-    db.insert(trafficLogs)
-      .values({
-        user_id: user.id,
-        node_id: node.id,
-        tx_bytes: traffic.tx,
-        rx_bytes: traffic.rx,
-      })
-      .run();
-
-    // 累加用户已用流量
-    db.update(users)
-      .set({ used_bytes: sql`used_bytes + ${totalBytes}` })
-      .where(eq(users.id, user.id))
-      .run();
-
-    result.synced++;
+    db.$client.run("COMMIT");
+  } catch (err: any) {
+    db.$client.run("ROLLBACK");
+    // 记录原始数据，防止 clear=1 后数据彻底丢失
+    console.error(`Traffic sync DB write failed for node ${node.name}, raw data:`, JSON.stringify(data));
+    result.errors.push(`DB write failed: ${err.message}`);
   }
 
   return result;
@@ -133,6 +143,14 @@ export function getTrafficStats(db: Db, filters?: TrafficFilters): TrafficStat[]
     rxBytes: r.rx_bytes!,
     recordedAt: r.recorded_at!,
   }));
+}
+
+// 清理过期流量日志（默认保留 90 天）
+export function cleanupOldTrafficLogs(db: Db, retentionDays: number = 90): void {
+  db.$client.run(
+    `DELETE FROM traffic_logs WHERE recorded_at < datetime('now', ?)`,
+    [`-${retentionDays} days`]
+  );
 }
 
 // 启动定时流量同步

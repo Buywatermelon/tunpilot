@@ -41,7 +41,7 @@ export function initDatabase(path: string): Db {
     CREATE TABLE IF NOT EXISTS users (
       id            TEXT PRIMARY KEY,
       name          TEXT NOT NULL UNIQUE,
-      password      TEXT NOT NULL,
+      password      TEXT NOT NULL UNIQUE,
       quota_bytes   INTEGER DEFAULT 0,
       used_bytes    INTEGER DEFAULT 0,
       expires_at    TEXT,
@@ -81,12 +81,17 @@ export function initDatabase(path: string): Db {
   `);
 
   // 索引
-  sqlite.run(`CREATE INDEX IF NOT EXISTS idx_users_password ON users(password)`);
+  sqlite.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_password ON users(password)`);
   sqlite.run(`CREATE INDEX IF NOT EXISTS idx_traffic_logs_recorded_at ON traffic_logs(recorded_at)`);
   sqlite.run(`CREATE INDEX IF NOT EXISTS idx_traffic_logs_user_node ON traffic_logs(user_id, node_id)`);
 
-  // 在线迁移：为已有数据库添加新列
+  // 在线迁移：为已有数据库添加新列/升级索引
   try { sqlite.run(`ALTER TABLE nodes ADD COLUMN insecure INTEGER DEFAULT 0`); } catch {}
+  // 升级 password 索引为 UNIQUE（先删旧索引再建新索引）
+  try {
+    sqlite.run(`DROP INDEX IF EXISTS idx_users_password`);
+    sqlite.run(`CREATE UNIQUE INDEX idx_users_password ON users(password)`);
+  } catch {}
 
   return drizzle(sqlite, { schema });
 }
