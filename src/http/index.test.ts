@@ -1,6 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { Database } from "bun:sqlite";
-import { initDatabase } from "../db/index";
+import { initDatabase, type Db } from "../db/index";
 import { addNode } from "../services/node";
 import { createUser, assignNodesToUser } from "../services/user";
 import { generateSubscription } from "../services/subscription";
@@ -8,7 +7,7 @@ import { createHttpApp } from "./index";
 
 const BASE_URL = "https://tunpilot.example.com";
 
-let db: Database;
+let db: Db;
 let app: ReturnType<typeof createHttpApp>;
 
 beforeEach(() => {
@@ -17,7 +16,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  db.close();
+  db.$client.close();
 });
 
 function req(path: string, init?: RequestInit) {
@@ -78,7 +77,7 @@ describe("POST /auth/:nodeId/:authSecret", () => {
     const node = addNode(db, { name: "n1", host: "1.1.1.1", port: 443, protocol: "hysteria2" });
     const user = createUser(db, { name: "alice", password: "pass123" });
     assignNodesToUser(db, user.id, [node.id]);
-    db.run(`UPDATE users SET enabled = 0 WHERE id = '${user.id}'`);
+    db.$client.run(`UPDATE users SET enabled = 0 WHERE id = '${user.id}'`);
 
     const res = await req(`/auth/${node.id}/${node.auth_secret}`, {
       method: "POST",
@@ -115,7 +114,7 @@ describe("POST /auth/:nodeId/:authSecret", () => {
     const node = addNode(db, { name: "n1", host: "1.1.1.1", port: 443, protocol: "hysteria2" });
     const user = createUser(db, { name: "alice", password: "pass123", quota_bytes: 1000 });
     assignNodesToUser(db, user.id, [node.id]);
-    db.run(`UPDATE users SET used_bytes = 1000 WHERE id = '${user.id}'`);
+    db.$client.run(`UPDATE users SET used_bytes = 1000 WHERE id = '${user.id}'`);
 
     const res = await req(`/auth/${node.id}/${node.auth_secret}`, {
       method: "POST",

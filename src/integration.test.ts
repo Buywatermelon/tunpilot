@@ -1,6 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { Database } from "bun:sqlite";
-import { initDatabase } from "./db/index";
+import { initDatabase, type Db } from "./db/index";
 import { createHttpApp } from "./http/index";
 import { addNode } from "./services/node";
 import { createUser, assignNodesToUser } from "./services/user";
@@ -8,7 +7,7 @@ import { generateSubscription } from "./services/subscription";
 
 const BASE_URL = "https://tunpilot.example.com";
 
-let db: Database;
+let db: Db;
 let app: ReturnType<typeof createHttpApp>;
 
 function req(path: string, init?: RequestInit) {
@@ -21,7 +20,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  db.close();
+  db.$client.close();
 });
 
 // --- Full Auth Flow ---
@@ -98,7 +97,7 @@ describe("integration: auth rejection cases", () => {
 
   test("disabled user is rejected", async () => {
     const { node, user } = setupBasicAuth();
-    db.run(`UPDATE users SET enabled = 0 WHERE id = ?`, [user.id]);
+    db.$client.run(`UPDATE users SET enabled = 0 WHERE id = ?`, [user.id]);
 
     const res = await req(`/auth/${node.id}/${node.auth_secret}`, {
       method: "POST",
@@ -110,7 +109,7 @@ describe("integration: auth rejection cases", () => {
 
   test("expired user is rejected", async () => {
     const { node, user } = setupBasicAuth();
-    db.run(`UPDATE users SET expires_at = '2020-01-01 00:00:00' WHERE id = ?`, [user.id]);
+    db.$client.run(`UPDATE users SET expires_at = '2020-01-01 00:00:00' WHERE id = ?`, [user.id]);
 
     const res = await req(`/auth/${node.id}/${node.auth_secret}`, {
       method: "POST",
@@ -122,7 +121,7 @@ describe("integration: auth rejection cases", () => {
 
   test("over-quota user is rejected", async () => {
     const { node, user } = setupBasicAuth();
-    db.run(`UPDATE users SET used_bytes = 1001 WHERE id = ?`, [user.id]);
+    db.$client.run(`UPDATE users SET used_bytes = 1001 WHERE id = ?`, [user.id]);
 
     const res = await req(`/auth/${node.id}/${node.auth_secret}`, {
       method: "POST",
@@ -134,7 +133,7 @@ describe("integration: auth rejection cases", () => {
 
   test("disabled node is rejected", async () => {
     const { node, user } = setupBasicAuth();
-    db.run(`UPDATE nodes SET enabled = 0 WHERE id = ?`, [node.id]);
+    db.$client.run(`UPDATE nodes SET enabled = 0 WHERE id = ?`, [node.id]);
 
     const res = await req(`/auth/${node.id}/${node.auth_secret}`, {
       method: "POST",
