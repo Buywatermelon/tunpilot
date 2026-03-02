@@ -1,12 +1,20 @@
 import { Database } from "bun:sqlite";
+import { drizzle, type BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
+import * as schema from "./schema";
 
-export function initDatabase(path: string): Database {
-  const db = new Database(path);
+// 数据库实例类型，所有 service 函数使用此类型
+// 包含 $client 属性以访问底层 bun:sqlite Database
+export type Db = BunSQLiteDatabase<typeof schema> & { $client: Database };
 
-  db.run("PRAGMA journal_mode = WAL");
-  db.run("PRAGMA foreign_keys = ON");
+// 初始化数据库：创建表 + 返回 Drizzle 实例
+export function initDatabase(path: string): Db {
+  const sqlite = new Database(path);
+  sqlite.run("PRAGMA journal_mode = WAL");
+  sqlite.run("PRAGMA foreign_keys = ON");
 
-  db.run(`
+  // 建表（CREATE TABLE IF NOT EXISTS 保证幂等）
+  // 生产环境也可用 drizzle-kit push 同步 schema
+  sqlite.run(`
     CREATE TABLE IF NOT EXISTS nodes (
       id            TEXT PRIMARY KEY,
       name          TEXT NOT NULL,
@@ -28,7 +36,7 @@ export function initDatabase(path: string): Database {
     )
   `);
 
-  db.run(`
+  sqlite.run(`
     CREATE TABLE IF NOT EXISTS users (
       id            TEXT PRIMARY KEY,
       name          TEXT NOT NULL UNIQUE,
@@ -42,7 +50,7 @@ export function initDatabase(path: string): Database {
     )
   `);
 
-  db.run(`
+  sqlite.run(`
     CREATE TABLE IF NOT EXISTS user_nodes (
       user_id       TEXT REFERENCES users(id) ON DELETE CASCADE,
       node_id       TEXT REFERENCES nodes(id) ON DELETE CASCADE,
@@ -50,7 +58,7 @@ export function initDatabase(path: string): Database {
     )
   `);
 
-  db.run(`
+  sqlite.run(`
     CREATE TABLE IF NOT EXISTS subscriptions (
       id            TEXT PRIMARY KEY,
       user_id       TEXT REFERENCES users(id) ON DELETE CASCADE,
@@ -60,7 +68,7 @@ export function initDatabase(path: string): Database {
     )
   `);
 
-  db.run(`
+  sqlite.run(`
     CREATE TABLE IF NOT EXISTS traffic_logs (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id       TEXT REFERENCES users(id),
@@ -71,5 +79,5 @@ export function initDatabase(path: string): Database {
     )
   `);
 
-  return db;
+  return drizzle(sqlite, { schema });
 }
