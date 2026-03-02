@@ -13,30 +13,30 @@ import { dirname } from "node:path";
 
 const config = getConfig();
 
-// Ensure data directory exists
+// 确保数据目录存在
 mkdirSync(dirname(config.dbPath), { recursive: true });
 
-// Initialize database
+// 初始化数据库
 const db = initDatabase(config.dbPath);
 
-// Create HTTP app with all routes
+// 创建 HTTP 应用
 const httpApp = createHttpApp(db, config.baseUrl);
 
-// Create MCP server
+// 创建 MCP 服务器
 const mcpServer = createMcpServer(db, config.baseUrl);
 
-// Create main Hono app
+// 创建主 Hono 应用
 const app = new Hono();
 
-// Mount HTTP routes
+// 挂载 HTTP 路由
 app.route("/", httpApp);
 
-// MCP endpoint with Bearer token auth
+// MCP 端点 Bearer Token 认证
 if (config.mcpAuthToken) {
   app.use("/mcp", bearerAuth({ token: config.mcpAuthToken }));
 }
 
-// Mount MCP on /mcp using StreamableHTTPTransport
+// 挂载 MCP（使用 StreamableHTTPTransport）
 const transport = new StreamableHTTPTransport({ sessionIdGenerator: () => crypto.randomUUID() });
 mcpServer.connect(transport);
 
@@ -45,10 +45,10 @@ app.all("/mcp", async (c) => {
   return response ?? c.text("", 405);
 });
 
-// Start traffic sync
+// 启动流量同步
 const syncTimer = startTrafficSync(db, config.trafficSyncInterval);
 
-// Start server
+// 启动服务器
 const server = Bun.serve({
   port: config.port,
   hostname: config.host,
@@ -60,11 +60,11 @@ console.log(`  HTTP endpoints: /health, /auth/:nodeId/:authSecret, /sub/:token`)
 console.log(`  MCP endpoint: /mcp`);
 console.log(`  Traffic sync interval: ${config.trafficSyncInterval / 1000}s`);
 
-// Graceful shutdown
+// 优雅关闭
 process.on("SIGINT", () => {
   console.log("Shutting down...");
   clearInterval(syncTimer);
   server.stop();
-  db.close();
+  db.$client.close();
   process.exit(0);
 });

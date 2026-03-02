@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { Database } from "bun:sqlite";
+import type { Db } from "../db/index";
 import { authenticate } from "../services/auth";
 import { getUser, getUserNodes } from "../services/user";
 import {
@@ -9,10 +9,10 @@ import {
   renderClash,
 } from "../services/subscription";
 
-export function createHttpApp(db: Database, _baseUrl: string): Hono {
+export function createHttpApp(db: Db, _baseUrl: string): Hono {
   const app = new Hono();
 
-  // Auth callback — Hysteria2 nodes POST here
+  // Hysteria2 节点认证回调
   app.post("/auth/:nodeId/:authSecret", async (c) => {
     let password = "";
     try {
@@ -31,7 +31,7 @@ export function createHttpApp(db: Database, _baseUrl: string): Hono {
     return c.json(result);
   });
 
-  // Subscription download
+  // 订阅链接下载
   app.get("/sub/:token", (c) => {
     const { token } = c.req.param();
     const sub = getSubscriptionByToken(db, token);
@@ -68,7 +68,7 @@ export function createHttpApp(db: Database, _baseUrl: string): Hono {
     }
   });
 
-  // Health probe
+  // 健康检查
   app.get("/health", (c) => {
     return c.json({ status: "ok", timestamp: new Date().toISOString() });
   });
