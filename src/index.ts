@@ -22,9 +22,6 @@ const db = initDatabase(config.dbPath);
 // 创建 HTTP 应用
 const httpApp = createHttpApp(db, config.baseUrl);
 
-// 创建 MCP 服务器
-const mcpServer = createMcpServer(db, config.baseUrl);
-
 // 创建主 Hono 应用
 const app = new Hono();
 
@@ -36,13 +33,37 @@ if (config.mcpAuthToken) {
   app.use("/mcp", bearerAuth({ token: config.mcpAuthToken }));
 }
 
-// 挂载 MCP（使用 StreamableHTTPTransport）
-const transport = new StreamableHTTPTransport({ sessionIdGenerator: () => crypto.randomUUID() });
-mcpServer.connect(transport);
+// MCP 会话管理：每个客户端连接独立的 McpServer + Transport
+const sessions = new Map<string, StreamableHTTPTransport>();
 
 app.all("/mcp", async (c) => {
-  const response = await transport.handleRequest(c);
-  return response ?? c.text("", 405);
+  const sessionId = c.req.header("mcp-session-id");
+
+  // 已有会话：路由到对应 transport
+  if (sessionId) {
+    const transport = sessions.get(sessionId);
+    if (!transport) {
+      return c.json(
+        { jsonrpc: "2.0", error: { code: -32000, message: "Session not found" }, id: null },
+        404,
+      );
+    }
+    return transport.handleRequest(c);
+  }
+
+  // 新连接：创建独立的 McpServer + Transport
+  const mcpServer = createMcpServer(db, config.baseUrl);
+  const transport = new StreamableHTTPTransport({
+    sessionIdGenerator: () => crypto.randomUUID(),
+    onsessioninitialized: (id: string) => {
+      sessions.set(id, transport);
+    },
+    onsessionclosed: (id: string) => {
+      sessions.delete(id);
+    },
+  });
+  await mcpServer.connect(transport);
+  return transport.handleRequest(c);
 });
 
 // 启动流量同步
