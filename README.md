@@ -38,13 +38,14 @@ openclaw plugins install @tunpilot/openclaw-plugin
 安装插件后，直接告诉 Agent 你想做什么：
 
 ```
-> 帮我在服务器上部署 TunPilot 并连接 MCP
+> 帮我在 root@1.2.3.4 上部署 TunPilot 并连接 MCP
 ```
 
 Agent 会自动加载 `getting-started` skill，引导完成：
-1. SSH 到你的服务器执行一键部署脚本
-2. 配置 MCP 连接
-3. 验证连接状态
+1. 验证 SSH 连通性（需要提前配好免密登录）
+2. SSH 到你的服务器执行一键部署脚本
+3. 配置 MCP 连接
+4. 验证连接状态
 
 连接成功后，继续用自然语言管理一切：
 

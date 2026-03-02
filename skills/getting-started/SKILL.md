@@ -19,9 +19,17 @@ Guide the user from zero to a fully connected TunPilot setup. Two phases: deploy
 
 ### Prerequisites
 
-Ask the user for:
-- **Server access**: SSH connection info (e.g. `ssh root@1.2.3.4` or an SSH alias)
-- Confirm the server runs Linux with root access
+Before starting, verify the following:
+
+1. **SSH connectivity** — Test that the agent can reach the target server:
+   ```bash
+   ssh <server> "echo ok"
+   ```
+   If this fails, the user needs to configure SSH key-based login first (the agent cannot enter passwords interactively).
+
+2. **Ask the user for**:
+   - **Target server**: SSH destination (e.g. `root@1.2.3.4`, `myserver`, or an SSH alias from `~/.ssh/config`)
+   - Confirm the server runs Linux with root access
 
 ### Deploy
 
