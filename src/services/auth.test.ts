@@ -1,19 +1,18 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { Database } from "bun:sqlite";
-import { initDatabase } from "../db/index.ts";
+import { initDatabase, type Db } from "../db/index";
 import { authenticate } from "./auth.ts";
 import { createUser, assignNodesToUser } from "./user.ts";
 import { addNode } from "./node.ts";
 
 describe("auth service", () => {
-  let db: Database;
+  let db: Db;
 
   beforeEach(() => {
     db = initDatabase(":memory:");
   });
 
   afterEach(() => {
-    db?.close();
+    db?.$client?.close();
   });
 
   function setupNodeAndUser() {
@@ -28,68 +27,68 @@ describe("auth service", () => {
     return { node, user };
   }
 
-  // --- Node validation ---
+  // --- 节点校验 ---
 
-  test("rejects when node does not exist", () => {
+  test("节点不存在时拒绝", () => {
     const result = authenticate(db, "nonexistent", "badsecret", "secret123");
     expect(result).toEqual({ ok: false });
   });
 
-  test("rejects when auth_secret does not match", () => {
+  test("auth_secret 不匹配时拒绝", () => {
     const { node } = setupNodeAndUser();
     const result = authenticate(db, node.id, "wrong-secret", "secret123");
     expect(result).toEqual({ ok: false });
   });
 
-  test("rejects when node is disabled", () => {
+  test("节点禁用时拒绝", () => {
     const { node, user } = setupNodeAndUser();
-    db.run("UPDATE nodes SET enabled = 0 WHERE id = ?", [node.id]);
+    db.$client.run("UPDATE nodes SET enabled = 0 WHERE id = ?", [node.id]);
     const result = authenticate(db, node.id, node.auth_secret, "secret123");
     expect(result).toEqual({ ok: false });
   });
 
-  // --- User validation ---
+  // --- 用户校验 ---
 
-  test("rejects when no user matches password", () => {
+  test("无匹配密码的用户时拒绝", () => {
     const { node } = setupNodeAndUser();
     const result = authenticate(db, node.id, node.auth_secret, "wrongpassword");
     expect(result).toEqual({ ok: false });
   });
 
-  test("rejects when user is disabled", () => {
+  test("用户禁用时拒绝", () => {
     const { node, user } = setupNodeAndUser();
-    db.run("UPDATE users SET enabled = 0 WHERE id = ?", [user.id]);
+    db.$client.run("UPDATE users SET enabled = 0 WHERE id = ?", [user.id]);
     const result = authenticate(db, node.id, node.auth_secret, "secret123");
     expect(result).toEqual({ ok: false });
   });
 
-  test("rejects when user is expired", () => {
+  test("用户过期时拒绝", () => {
     const { node, user } = setupNodeAndUser();
-    db.run("UPDATE users SET expires_at = '2020-01-01 00:00:00' WHERE id = ?", [
+    db.$client.run("UPDATE users SET expires_at = '2020-01-01 00:00:00' WHERE id = ?", [
       user.id,
     ]);
     const result = authenticate(db, node.id, node.auth_secret, "secret123");
     expect(result).toEqual({ ok: false });
   });
 
-  test("allows user with future expiry", () => {
+  test("允许未过期的用户", () => {
     const { node, user } = setupNodeAndUser();
-    db.run("UPDATE users SET expires_at = '2099-12-31 23:59:59' WHERE id = ?", [
+    db.$client.run("UPDATE users SET expires_at = '2099-12-31 23:59:59' WHERE id = ?", [
       user.id,
     ]);
     const result = authenticate(db, node.id, node.auth_secret, "secret123");
     expect(result).toEqual({ ok: true, id: "alice" });
   });
 
-  test("allows user with null expires_at (never expires)", () => {
+  test("允许 expires_at 为 null（永不过期）的用户", () => {
     const { node } = setupNodeAndUser();
     const result = authenticate(db, node.id, node.auth_secret, "secret123");
     expect(result).toEqual({ ok: true, id: "alice" });
   });
 
-  test("rejects when user exceeds quota", () => {
+  test("用户超出流量配额时拒绝", () => {
     const { node, user } = setupNodeAndUser();
-    db.run(
+    db.$client.run(
       "UPDATE users SET quota_bytes = 1000, used_bytes = 1001 WHERE id = ?",
       [user.id]
     );
@@ -97,9 +96,9 @@ describe("auth service", () => {
     expect(result).toEqual({ ok: false });
   });
 
-  test("allows user with zero quota (unlimited)", () => {
+  test("允许配额为 0（无限）的用户", () => {
     const { node, user } = setupNodeAndUser();
-    db.run(
+    db.$client.run(
       "UPDATE users SET quota_bytes = 0, used_bytes = 999999999 WHERE id = ?",
       [user.id]
     );
@@ -107,9 +106,9 @@ describe("auth service", () => {
     expect(result).toEqual({ ok: true, id: "alice" });
   });
 
-  test("allows user under quota", () => {
+  test("允许配额内的用户", () => {
     const { node, user } = setupNodeAndUser();
-    db.run(
+    db.$client.run(
       "UPDATE users SET quota_bytes = 1000, used_bytes = 500 WHERE id = ?",
       [user.id]
     );
@@ -117,9 +116,9 @@ describe("auth service", () => {
     expect(result).toEqual({ ok: true, id: "alice" });
   });
 
-  // --- Node permission ---
+  // --- 节点权限 ---
 
-  test("rejects when user is not assigned to node", () => {
+  test("用户未分配到节点时拒绝", () => {
     const node = addNode(db, {
       name: "US-1",
       host: "1.1.1.1",
@@ -127,14 +126,14 @@ describe("auth service", () => {
       protocol: "hysteria2",
     });
     createUser(db, { name: "alice", password: "secret123" });
-    // No assignNodesToUser call
+    // 未调用 assignNodesToUser
     const result = authenticate(db, node.id, node.auth_secret, "secret123");
     expect(result).toEqual({ ok: false });
   });
 
-  // --- Success ---
+  // --- 认证成功 ---
 
-  test("returns ok with user name as id on success", () => {
+  test("认证成功时返回用户名作为 ID", () => {
     const { node } = setupNodeAndUser();
     const result = authenticate(db, node.id, node.auth_secret, "secret123");
     expect(result).toEqual({ ok: true, id: "alice" });
