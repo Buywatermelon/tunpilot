@@ -11,7 +11,7 @@ metadata:
       bins:
         - ssh
     emoji: "🛰️"
-    homepage: https://github.com/user/tunpilot
+    homepage: https://github.com/Buywatermelon/tunpilot
 ---
 
 # TunPilot Node Deployment & Operations

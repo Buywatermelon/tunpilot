@@ -1,6 +1,6 @@
 # TunPilot Claude Code Plugin
 
-[TunPilot](https://github.com/user/tunpilot) 的 Claude Code 插件。安装后 Claude Code 可直接调用 TunPilot MCP 工具管理 Hysteria2 代理节点。
+[TunPilot](https://github.com/Buywatermelon/tunpilot) 的 Claude Code 插件。安装后 Claude Code 可直接调用 TunPilot MCP 工具管理 Hysteria2 代理节点。
 
 ## 安装
 

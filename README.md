@@ -169,8 +169,8 @@ TunPilot 通过两个独立渠道分发给 Agent 客户端：
 
 | 渠道 | 目录 | 说明 |
 |------|------|------|
-| Claude Code Plugin | `plugin/` | Claude Code 插件，配置 MCP 连接 |
-| OpenClaw Plugin | `openclaw/` | OpenClaw 插件，注册 MCP 服务 + 配置 UI |
+| Claude Code Plugin | [`plugin/`](plugin/README.md) | Claude Code 插件，配置 MCP 连接 |
+| OpenClaw Plugin | [`openclaw/`](openclaw/README.md) | OpenClaw 插件，注册 MCP 服务 + 配置 UI |
 
 两个渠道共享 `skills/` 目录下的 Skill 内容（部署指南、配置模板），发布时由 CI 复制到各分发目录。
 

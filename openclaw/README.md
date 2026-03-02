@@ -1,6 +1,6 @@
 # TunPilot OpenClaw Plugin
 
-[TunPilot](https://github.com/user/tunpilot) 的 OpenClaw 插件。一键安装即可获得 MCP 连接配置、Skill 和 Gateway UI 集成。
+[TunPilot](https://github.com/Buywatermelon/tunpilot) 的 OpenClaw 插件。一键安装即可获得 MCP 连接配置、Skill 和 Gateway UI 集成。
 
 ## 安装
 
