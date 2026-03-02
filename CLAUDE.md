@@ -1,106 +1,83 @@
+# TunPilot
 
-Default to using Bun instead of Node.js.
+Agent-native Hysteria2 proxy node management service. No web UI — designed for LLM Agents via MCP.
 
-- Use `bun <file>` instead of `node <file>` or `ts-node <file>`
-- Use `bun test` instead of `jest` or `vitest`
-- Use `bun build <file.html|file.ts|file.css>` instead of `webpack` or `esbuild`
-- Use `bun install` instead of `npm install` or `yarn install` or `pnpm install`
-- Use `bun run <script>` instead of `npm run <script>` or `yarn run <script>` or `pnpm run <script>`
-- Use `bunx <package> <command>` instead of `npx <package> <command>`
-- Bun automatically loads .env, so don't use dotenv.
+## Tech Stack
 
-## APIs
+- **Runtime**: Bun (not Node.js)
+- **HTTP**: Hono
+- **Database**: SQLite via Drizzle ORM (`bun:sqlite`)
+- **MCP**: `@modelcontextprotocol/sdk` + `@hono/mcp` (Streamable HTTP)
 
-- `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
-- `bun:sqlite` for SQLite. Don't use `better-sqlite3`.
-- `Bun.redis` for Redis. Don't use `ioredis`.
-- `Bun.sql` for Postgres. Don't use `pg` or `postgres.js`.
-- `WebSocket` is built-in. Don't use `ws`.
-- Prefer `Bun.file` over `node:fs`'s readFile/writeFile
-- Bun.$`ls` instead of execa.
+## Project Structure
 
-## Testing
-
-Use `bun test` to run tests.
-
-```ts#index.test.ts
-import { test, expect } from "bun:test";
-
-test("hello world", () => {
-  expect(1).toBe(1);
-});
+```
+src/
+├── index.ts              # Entry point: server startup, MCP session management, traffic sync
+├── config.ts             # Environment config (TUNPILOT_PORT, TUNPILOT_BASE_URL, etc.)
+├── db/
+│   ├── schema.ts         # Drizzle schema: nodes, users, userNodes, subscriptions, trafficLogs
+│   └── index.ts          # DB init (WAL mode, foreign keys)
+├── http/index.ts         # HTTP routes: /auth/:nodeId/:authSecret, /sub/:token, /health
+├── mcp/
+│   ├── index.ts          # MCP server factory
+│   └── tools/            # 17 MCP tools in 4 groups
+│       ├── nodes.ts      # Node CRUD (4 tools)
+│       ├── users.ts      # User CRUD (7 tools)
+│       ├── subscriptions.ts  # Subscription management (4 tools)
+│       └── monitoring.ts # Health check & traffic stats (2 tools)
+└── services/             # Business logic layer
+    ├── auth.ts           # 4-step Hysteria2 auth callback
+    ├── node.ts           # Node CRUD
+    ├── user.ts           # User CRUD + node assignment
+    ├── subscription.ts   # Subscription lifecycle
+    ├── traffic.ts        # Traffic sync from nodes + stats query
+    └── formats/          # Subscription format renderers (Format Registry pattern)
+        ├── index.ts      # Registry: registerFormat() / getFormat()
+        ├── shadowrocket.ts
+        ├── singbox.ts
+        ├── clash.ts
+        └── surge.ts
+plugin/                   # Claude Code plugin (skills + MCP connection)
+openclaw/                 # OpenClaw plugin (skills + gateway auto-registration)
+skills/                   # Shared skill definitions (synced to plugin dirs)
+scripts/deploy.sh         # One-click deployment to systemd
 ```
 
-## Frontend
-
-Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully support React, CSS, Tailwind.
-
-Server:
-
-```ts#index.ts
-import index from "./index.html"
-
-Bun.serve({
-  routes: {
-    "/": index,
-    "/api/users/:id": {
-      GET: (req) => {
-        return new Response(JSON.stringify({ id: req.params.id }));
-      },
-    },
-  },
-  // optional websocket support
-  websocket: {
-    open: (ws) => {
-      ws.send("Hello, world!");
-    },
-    message: (ws, message) => {
-      ws.send(message);
-    },
-    close: (ws) => {
-      // handle close
-    }
-  },
-  development: {
-    hmr: true,
-    console: true,
-  }
-})
-```
-
-HTML files can import .tsx, .jsx or .js files directly and Bun's bundler will transpile & bundle automatically. `<link>` tags can point to stylesheets and Bun's CSS bundler will bundle.
-
-```html#index.html
-<html>
-  <body>
-    <h1>Hello, world!</h1>
-    <script type="module" src="./frontend.tsx"></script>
-  </body>
-</html>
-```
-
-With the following `frontend.tsx`:
-
-```tsx#frontend.tsx
-import React from "react";
-import { createRoot } from "react-dom/client";
-
-// import .css files directly and it works
-import './index.css';
-
-const root = createRoot(document.body);
-
-export default function Frontend() {
-  return <h1>Hello, world!</h1>;
-}
-
-root.render(<Frontend />);
-```
-
-Then, run index.ts
+## Commands
 
 ```sh
-bun --hot ./index.ts
+bun run dev          # Hot reload development
+bun run start        # Production
+bun test             # Run all tests
+bun run db:push      # Sync Drizzle schema to SQLite
+bun run db:studio    # Drizzle Studio (DB browser)
 ```
 
-For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
+## Environment Variables
+
+Bun auto-loads `.env` — no dotenv needed.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TUNPILOT_PORT` | 3000 | Listen port |
+| `TUNPILOT_HOST` | 0.0.0.0 | Listen address |
+| `TUNPILOT_DB_PATH` | ./data/tunpilot.db | SQLite database path |
+| `TUNPILOT_BASE_URL` | http://localhost:3000 | External URL for subscription links |
+| `MCP_AUTH_TOKEN` | (empty) | Bearer token for /mcp endpoint |
+| `TRAFFIC_SYNC_INTERVAL` | 300000 | Traffic sync interval (ms) |
+
+## Key Patterns
+
+- **Auth flow**: Hysteria2 node → POST `/auth/:nodeId/:authSecret` → validate node → lookup user by password → check status/quota/expiry → check node permission
+- **Subscription formats**: implement `SubscriptionFormat` interface, call `registerFormat()` — auto-discovered on import
+- **MCP sessions**: per-client `McpServer` instances with 30-min TTL auto-cleanup
+- **Traffic sync**: periodic fetch from nodes' stats API → atomic transaction (insert logs + update used_bytes)
+- **Cascading deletes**: all FK relationships use ON DELETE CASCADE
+
+## Conventions
+
+- Use Bun APIs: `bun:sqlite`, `Bun.serve()`, `Bun.file()`, `bun test`
+- Don't use: express, better-sqlite3, dotenv, node:fs readFile/writeFile
+- Tests use `bun:test` with in-memory SQLite (`initDatabase(":memory:")`)
+- All database tables use UUID primary keys (except `trafficLogs` which uses auto-increment)
