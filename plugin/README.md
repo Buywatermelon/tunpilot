@@ -10,16 +10,29 @@ claude plugin install tunpilot
 
 ## 配置 MCP 连接
 
-TunPilot 是自托管服务，每个部署的 URL 不同，需要手动添加 MCP 连接：
+两种方式任选其一：
 
-```bash
-claude mcp add --transport http \
-  --header "Authorization: Bearer <your-mcp-token>" \
-  --scope user \
-  tunpilot https://<your-tunpilot-url>/mcp
+### 方式 A：交互式配置（推荐）
+
+安装插件后，在 Claude Code 中对话：
+
+```
+> 配置 TunPilot MCP 连接
 ```
 
-将 `<your-tunpilot-url>` 和 `<your-mcp-token>` 替换为实际值。添加后可通过 `/mcp` 确认连接状态。
+`setup-tunpilot` Skill 会引导你完成配置。
+
+### 方式 B：环境变量
+
+提前设置环境变量，插件自动配置 MCP 连接：
+
+```bash
+# 添加到 ~/.zshrc 或 ~/.bashrc
+export TUNPILOT_URL=https://your-tunpilot-server:3000
+export TUNPILOT_MCP_TOKEN=your-mcp-auth-token
+```
+
+重启 Claude Code 后 `/mcp` 确认连接状态。
 
 ## 使用
 
@@ -41,6 +54,7 @@ claude mcp add --transport http \
 
 | Skill | 说明 |
 |-------|------|
+| `setup-tunpilot` | 交互式引导配置 MCP 连接 |
 | `deploying-nodes` | Hysteria2 节点部署指南，包含配置模板和分步操作流程 |
 
 ## MCP 工具
