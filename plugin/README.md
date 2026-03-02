@@ -1,65 +1,46 @@
 # TunPilot Claude Code Plugin
 
-[TunPilot](https://github.com/Buywatermelon/tunpilot) 的 Claude Code 插件。安装后 Claude Code 可直接调用 TunPilot MCP 工具管理 Hysteria2 代理节点。
+[TunPilot](https://github.com/Buywatermelon/tunpilot) 的 Claude Code 插件。安装即获得全套 Skill，让 Agent 引导你完成从部署到管理的所有操作。
 
 ## 安装
 
 ```bash
-claude plugin install tunpilot
+/plugin marketplace add Buywatermelon/tunpilot
+/plugin install tunpilot@tunpilot
 ```
 
-## 配置 MCP 连接
+## 从零开始
 
-两种方式任选其一：
-
-### 方式 A：交互式配置（推荐）
-
-安装插件后，在 Claude Code 中对话：
+安装插件后，用自然语言驱动 Agent 完成一切：
 
 ```
-> 配置 TunPilot MCP 连接
+> 帮我在服务器上部署 TunPilot        ← deploy-server skill
+> 连接 TunPilot MCP                  ← setup-tunpilot skill
+> 部署一个新的 Hysteria2 节点         ← deploying-nodes skill
 ```
 
-`setup-tunpilot` Skill 会引导你完成配置。
+每一步都由对应的 Skill 引导 Agent 自动完成。
 
-### 方式 B：环境变量
+## Skill 列表
 
-提前设置环境变量，插件自动配置 MCP 连接：
+| Skill | 触发场景 | 作用 |
+|-------|---------|------|
+| `deploy-server` | 部署/安装/更新 TunPilot 服务 | 引导在服务器上执行一键部署脚本 |
+| `setup-tunpilot` | 配置/连接 MCP | 引导执行 `claude mcp add` 完成连接 |
+| `deploying-nodes` | 部署 Hysteria2 节点 | 提供配置模板和分步操作流程 |
 
-```bash
-# 添加到 ~/.zshrc 或 ~/.bashrc
-export TUNPILOT_URL=https://your-tunpilot-server:3000
-export TUNPILOT_MCP_TOKEN=your-mcp-auth-token
-```
+## MCP 连接后
 
-重启 Claude Code 后 `/mcp` 确认连接状态。
-
-## 使用
-
-安装配置完成后，在 Claude Code 中直接用自然语言操作：
+连接成功后可使用 16 个 MCP 工具，直接用自然语言操作：
 
 ```
 > 帮我添加一个新节点，host 是 us1.example.com，端口 443
-
 > 列出所有用户的流量使用情况
-
 > 给用户 alice 生成一个 Shadowrocket 订阅链接
-
-> 部署一个新的 Hysteria2 节点
+> 检查所有节点的证书到期状态
 ```
 
-最后一条会触发 `deploying-nodes` Skill，引导完成完整的节点部署流程。
-
-## 包含的 Skill
-
-| Skill | 说明 |
-|-------|------|
-| `setup-tunpilot` | 交互式引导配置 MCP 连接 |
-| `deploying-nodes` | Hysteria2 节点部署指南，包含配置模板和分步操作流程 |
-
-## MCP 工具
-
-插件连接后可使用 16 个 MCP 工具：
+### 工具清单
 
 - **节点**: `list_nodes`, `get_node_info`, `add_node`, `update_node`, `remove_node`
 - **用户**: `list_users`, `create_user`, `update_user`, `delete_user`, `reset_traffic`
