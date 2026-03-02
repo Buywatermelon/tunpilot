@@ -1,6 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { Database } from "bun:sqlite";
-import { initDatabase } from "../db/index.ts";
+import { initDatabase, type Db } from "../db/index";
 import {
   createUser,
   listUsers,
@@ -13,20 +12,20 @@ import {
 } from "./user.ts";
 
 describe("user service", () => {
-  let db: Database;
+  let db: Db;
 
   beforeEach(() => {
     db = initDatabase(":memory:");
   });
 
   afterEach(() => {
-    db?.close();
+    db?.$client?.close();
   });
 
   // --- createUser ---
 
   describe("createUser", () => {
-    test("creates user with required fields", () => {
+    test("使用必填字段创建用户", () => {
       const user = createUser(db, { name: "alice", password: "pass123" });
       expect(user.id).toBeDefined();
       expect(user.name).toBe("alice");
@@ -39,7 +38,7 @@ describe("user service", () => {
       expect(user.created_at).toBeDefined();
     });
 
-    test("creates user with optional fields", () => {
+    test("使用可选字段创建用户", () => {
       const user = createUser(db, {
         name: "bob",
         password: "secret",
@@ -52,13 +51,13 @@ describe("user service", () => {
       expect(user.max_devices).toBe(5);
     });
 
-    test("generates unique ids", () => {
+    test("生成唯一 ID", () => {
       const u1 = createUser(db, { name: "alice", password: "p1" });
       const u2 = createUser(db, { name: "bob", password: "p2" });
       expect(u1.id).not.toBe(u2.id);
     });
 
-    test("rejects duplicate name", () => {
+    test("拒绝重复用户名", () => {
       createUser(db, { name: "alice", password: "p1" });
       expect(() => createUser(db, { name: "alice", password: "p2" })).toThrow();
     });
@@ -67,12 +66,12 @@ describe("user service", () => {
   // --- listUsers ---
 
   describe("listUsers", () => {
-    test("returns empty array when no users", () => {
+    test("无用户时返回空数组", () => {
       const users = listUsers(db);
       expect(users).toEqual([]);
     });
 
-    test("returns all users", () => {
+    test("返回所有用户", () => {
       createUser(db, { name: "alice", password: "p1" });
       createUser(db, { name: "bob", password: "p2" });
       const users = listUsers(db);
@@ -80,7 +79,7 @@ describe("user service", () => {
       expect(users.map((u) => u.name).sort()).toEqual(["alice", "bob"]);
     });
 
-    test("includes used_bytes and enabled fields", () => {
+    test("包含 used_bytes 和 enabled 字段", () => {
       createUser(db, { name: "alice", password: "p1" });
       const users = listUsers(db);
       expect(users[0]!.used_bytes).toBe(0);
@@ -91,7 +90,7 @@ describe("user service", () => {
   // --- getUser ---
 
   describe("getUser", () => {
-    test("returns user by id", () => {
+    test("根据 ID 返回用户", () => {
       const created = createUser(db, { name: "alice", password: "p1" });
       const found = getUser(db, created.id);
       expect(found).not.toBeNull();
@@ -99,7 +98,7 @@ describe("user service", () => {
       expect(found!.id).toBe(created.id);
     });
 
-    test("returns null for non-existent id", () => {
+    test("ID 不存在时返回 null", () => {
       const found = getUser(db, "nonexistent");
       expect(found).toBeNull();
     });
@@ -108,42 +107,42 @@ describe("user service", () => {
   // --- updateUser ---
 
   describe("updateUser", () => {
-    test("updates quota_bytes", () => {
+    test("更新 quota_bytes", () => {
       const user = createUser(db, { name: "alice", password: "p1" });
       updateUser(db, user.id, { quota_bytes: 5368709120 });
       const updated = getUser(db, user.id);
       expect(updated!.quota_bytes).toBe(5368709120);
     });
 
-    test("updates expires_at", () => {
+    test("更新 expires_at", () => {
       const user = createUser(db, { name: "alice", password: "p1" });
       updateUser(db, user.id, { expires_at: "2027-01-01 00:00:00" });
       const updated = getUser(db, user.id);
       expect(updated!.expires_at).toBe("2027-01-01 00:00:00");
     });
 
-    test("updates enabled", () => {
+    test("更新 enabled", () => {
       const user = createUser(db, { name: "alice", password: "p1" });
       updateUser(db, user.id, { enabled: 0 });
       const updated = getUser(db, user.id);
       expect(updated!.enabled).toBe(0);
     });
 
-    test("updates password", () => {
+    test("更新 password", () => {
       const user = createUser(db, { name: "alice", password: "p1" });
       updateUser(db, user.id, { password: "newpass" });
       const updated = getUser(db, user.id);
       expect(updated!.password).toBe("newpass");
     });
 
-    test("updates max_devices", () => {
+    test("更新 max_devices", () => {
       const user = createUser(db, { name: "alice", password: "p1" });
       updateUser(db, user.id, { max_devices: 10 });
       const updated = getUser(db, user.id);
       expect(updated!.max_devices).toBe(10);
     });
 
-    test("updates multiple fields at once", () => {
+    test("同时更新多个字段", () => {
       const user = createUser(db, { name: "alice", password: "p1" });
       updateUser(db, user.id, {
         quota_bytes: 1000000,
@@ -156,7 +155,7 @@ describe("user service", () => {
       expect(updated!.max_devices).toBe(1);
     });
 
-    test("does nothing with empty updates", () => {
+    test("空更新不做任何操作", () => {
       const user = createUser(db, { name: "alice", password: "p1" });
       updateUser(db, user.id, {});
       const updated = getUser(db, user.id);
@@ -167,27 +166,27 @@ describe("user service", () => {
   // --- deleteUser ---
 
   describe("deleteUser", () => {
-    test("deletes existing user", () => {
+    test("删除已有用户", () => {
       const user = createUser(db, { name: "alice", password: "p1" });
       deleteUser(db, user.id);
       expect(getUser(db, user.id)).toBeNull();
     });
 
-    test("cascades to user_nodes", () => {
+    test("级联删除 user_nodes", () => {
       const user = createUser(db, { name: "alice", password: "p1" });
-      // Insert a node manually for the relationship
-      db.run(
+      // 手动插入节点以建立关联
+      db.$client.run(
         "INSERT INTO nodes (id, name, host, port, protocol, auth_secret) VALUES ('n1', 'US', 'host', 443, 'hysteria2', 'secret')"
       );
-      db.run(
+      db.$client.run(
         `INSERT INTO user_nodes (user_id, node_id) VALUES ('${user.id}', 'n1')`
       );
       deleteUser(db, user.id);
-      const rows = db.query("SELECT * FROM user_nodes").all();
+      const rows = db.$client.query("SELECT * FROM user_nodes").all();
       expect(rows).toHaveLength(0);
     });
 
-    test("does not throw for non-existent user", () => {
+    test("删除不存在的用户不抛异常", () => {
       expect(() => deleteUser(db, "nonexistent")).not.toThrow();
     });
   });
@@ -195,16 +194,16 @@ describe("user service", () => {
   // --- resetTraffic ---
 
   describe("resetTraffic", () => {
-    test("sets used_bytes to 0", () => {
+    test("将 used_bytes 重置为 0", () => {
       const user = createUser(db, { name: "alice", password: "p1" });
-      // Simulate traffic usage
-      db.run(`UPDATE users SET used_bytes = 999999 WHERE id = '${user.id}'`);
+      // 模拟流量使用
+      db.$client.run(`UPDATE users SET used_bytes = 999999 WHERE id = '${user.id}'`);
       resetTraffic(db, user.id);
       const updated = getUser(db, user.id);
       expect(updated!.used_bytes).toBe(0);
     });
 
-    test("does not throw for non-existent user", () => {
+    test("重置不存在的用户不抛异常", () => {
       expect(() => resetTraffic(db, "nonexistent")).not.toThrow();
     });
   });
@@ -213,41 +212,41 @@ describe("user service", () => {
 
   describe("assignNodesToUser", () => {
     function insertNode(id: string) {
-      db.run(
+      db.$client.run(
         `INSERT INTO nodes (id, name, host, port, protocol, auth_secret) VALUES ('${id}', 'Node ${id}', 'host', 443, 'hysteria2', 'secret')`
       );
     }
 
-    test("assigns nodes to user", () => {
+    test("为用户分配节点", () => {
       const user = createUser(db, { name: "alice", password: "p1" });
       insertNode("n1");
       insertNode("n2");
       assignNodesToUser(db, user.id, ["n1", "n2"]);
-      const rows = db
+      const rows = db.$client
         .query("SELECT node_id FROM user_nodes WHERE user_id = ?")
         .all(user.id) as { node_id: string }[];
       expect(rows.map((r) => r.node_id).sort()).toEqual(["n1", "n2"]);
     });
 
-    test("replaces existing assignments", () => {
+    test("替换现有分配", () => {
       const user = createUser(db, { name: "alice", password: "p1" });
       insertNode("n1");
       insertNode("n2");
       insertNode("n3");
       assignNodesToUser(db, user.id, ["n1", "n2"]);
       assignNodesToUser(db, user.id, ["n2", "n3"]);
-      const rows = db
+      const rows = db.$client
         .query("SELECT node_id FROM user_nodes WHERE user_id = ?")
         .all(user.id) as { node_id: string }[];
       expect(rows.map((r) => r.node_id).sort()).toEqual(["n2", "n3"]);
     });
 
-    test("clears all assignments with empty array", () => {
+    test("空数组清除所有分配", () => {
       const user = createUser(db, { name: "alice", password: "p1" });
       insertNode("n1");
       assignNodesToUser(db, user.id, ["n1"]);
       assignNodesToUser(db, user.id, []);
-      const rows = db
+      const rows = db.$client
         .query("SELECT node_id FROM user_nodes WHERE user_id = ?")
         .all(user.id);
       expect(rows).toHaveLength(0);
@@ -258,12 +257,12 @@ describe("user service", () => {
 
   describe("getUserNodes", () => {
     function insertNode(id: string, name: string) {
-      db.run(
+      db.$client.run(
         `INSERT INTO nodes (id, name, host, port, protocol, auth_secret) VALUES ('${id}', '${name}', 'host', 443, 'hysteria2', 'secret')`
       );
     }
 
-    test("returns nodes assigned to user", () => {
+    test("返回用户关联的节点", () => {
       const user = createUser(db, { name: "alice", password: "p1" });
       insertNode("n1", "US Node");
       insertNode("n2", "JP Node");
@@ -273,13 +272,13 @@ describe("user service", () => {
       expect(nodes.map((n) => n.name).sort()).toEqual(["JP Node", "US Node"]);
     });
 
-    test("returns empty array for user with no nodes", () => {
+    test("无节点时返回空数组", () => {
       const user = createUser(db, { name: "alice", password: "p1" });
       const nodes = getUserNodes(db, user.id);
       expect(nodes).toEqual([]);
     });
 
-    test("returns full node records", () => {
+    test("返回完整的节点记录", () => {
       const user = createUser(db, { name: "alice", password: "p1" });
       insertNode("n1", "US Node");
       assignNodesToUser(db, user.id, ["n1"]);
