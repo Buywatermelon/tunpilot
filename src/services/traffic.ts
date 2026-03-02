@@ -40,7 +40,7 @@ export async function syncTrafficFromNode(
       result.errors.push(`HTTP ${res.status} from node ${node.name}`);
       return result;
     }
-    data = await res.json();
+    data = await res.json() as Record<string, { tx: number; rx: number }>;
   } catch (err: any) {
     result.errors.push(`Fetch failed for node ${node.name}: ${err.message}`);
     return result;

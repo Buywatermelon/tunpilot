@@ -41,7 +41,7 @@ describe("auth service", () => {
   });
 
   test("节点禁用时拒绝", () => {
-    const { node, user } = setupNodeAndUser();
+    const { node } = setupNodeAndUser();
     db.$client.run("UPDATE nodes SET enabled = 0 WHERE id = ?", [node.id]);
     const result = authenticate(db, node.id, node.auth_secret, "secret123");
     expect(result).toEqual({ ok: false });

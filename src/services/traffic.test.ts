@@ -42,15 +42,15 @@ describe("syncTrafficFromNode", () => {
     const node = createNodeWithStats();
     const user = createUser(db, { name: "alice", password: "pass" });
 
-    globalThis.fetch = async (url, opts) => {
+    globalThis.fetch = (async (url: any, opts: any) => {
       expect(String(url)).toBe(`http://${node.host}:${node.stats_port}/traffic?clear=1`);
       expect((opts?.headers as Record<string, string>)?.["Authorization"]).toBe(
-        node.stats_secret
+        node.stats_secret!
       );
       return new Response(
         JSON.stringify({ alice: { tx: 1000, rx: 2000 } })
       );
-    };
+    }) as any;
 
     const result = await syncTrafficFromNode(db, node);
 
@@ -78,14 +78,14 @@ describe("syncTrafficFromNode", () => {
     const alice = createUser(db, { name: "alice", password: "pass" });
     const bob = createUser(db, { name: "bob", password: "pass" });
 
-    globalThis.fetch = async () => {
+    globalThis.fetch = (async () => {
       return new Response(
         JSON.stringify({
           alice: { tx: 100, rx: 200 },
           bob: { tx: 500, rx: 600 },
         })
       );
-    };
+    }) as any;
 
     const result = await syncTrafficFromNode(db, node);
 
@@ -107,14 +107,14 @@ describe("syncTrafficFromNode", () => {
     const node = createNodeWithStats();
     createUser(db, { name: "alice", password: "pass" });
 
-    globalThis.fetch = async () => {
+    globalThis.fetch = (async () => {
       return new Response(
         JSON.stringify({
           alice: { tx: 100, rx: 200 },
           unknown_user: { tx: 50, rx: 50 },
         })
       );
-    };
+    }) as any;
 
     const result = await syncTrafficFromNode(db, node);
 
@@ -127,13 +127,13 @@ describe("syncTrafficFromNode", () => {
     const node = createNodeWithStats();
     createUser(db, { name: "alice", password: "pass" });
 
-    globalThis.fetch = async () => {
+    globalThis.fetch = (async () => {
       return new Response(
         JSON.stringify({
           alice: { tx: 0, rx: 0 },
         })
       );
-    };
+    }) as any;
 
     const result = await syncTrafficFromNode(db, node);
 
@@ -147,9 +147,9 @@ describe("syncTrafficFromNode", () => {
   test("优雅处理 fetch 失败", async () => {
     const node = createNodeWithStats();
 
-    globalThis.fetch = async () => {
+    globalThis.fetch = (async () => {
       throw new Error("Connection refused");
-    };
+    }) as any;
 
     const result = await syncTrafficFromNode(db, node);
 
@@ -162,9 +162,9 @@ describe("syncTrafficFromNode", () => {
   test("处理非 OK HTTP 响应", async () => {
     const node = createNodeWithStats();
 
-    globalThis.fetch = async () => {
+    globalThis.fetch = (async () => {
       return new Response("Internal Server Error", { status: 500 });
-    };
+    }) as any;
 
     const result = await syncTrafficFromNode(db, node);
 
@@ -177,11 +177,11 @@ describe("syncTrafficFromNode", () => {
     const node = createNodeWithStats();
     const user = createUser(db, { name: "alice", password: "pass" });
 
-    globalThis.fetch = async () => {
+    globalThis.fetch = (async () => {
       return new Response(
         JSON.stringify({ alice: { tx: 1000, rx: 2000 } })
       );
-    };
+    }) as any;
 
     await syncTrafficFromNode(db, node);
     await syncTrafficFromNode(db, node);
@@ -220,11 +220,11 @@ describe("syncAllNodes", () => {
 
     createUser(db, { name: "alice", password: "pass" });
 
-    globalThis.fetch = async () => {
+    globalThis.fetch = (async () => {
       return new Response(
         JSON.stringify({ alice: { tx: 100, rx: 200 } })
       );
-    };
+    }) as any;
 
     const results = await syncAllNodes(db);
 
@@ -239,7 +239,7 @@ describe("syncAllNodes", () => {
     createUser(db, { name: "alice", password: "pass" });
 
     let callCount = 0;
-    globalThis.fetch = async (url) => {
+    globalThis.fetch = (async (url: any) => {
       callCount++;
       if (String(url).includes("1.1.1.1")) {
         throw new Error("Connection refused");
@@ -247,7 +247,7 @@ describe("syncAllNodes", () => {
       return new Response(
         JSON.stringify({ alice: { tx: 100, rx: 200 } })
       );
-    };
+    }) as any;
 
     const results = await syncAllNodes(db);
 
@@ -410,10 +410,10 @@ describe("startTrafficSync", () => {
     createUser(db, { name: "alice", password: "pass" });
 
     let fetchCallCount = 0;
-    globalThis.fetch = async () => {
+    globalThis.fetch = (async () => {
       fetchCallCount++;
       return new Response(JSON.stringify({ alice: { tx: 10, rx: 20 } }));
-    };
+    }) as any;
 
     const timer = startTrafficSync(db, 50);
 
