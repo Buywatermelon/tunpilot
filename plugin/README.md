@@ -8,28 +8,18 @@
 claude plugin install tunpilot
 ```
 
-## 配置
+## 配置 MCP 连接
 
-插件需要两个环境变量：
+TunPilot 是自托管服务，每个部署的 URL 不同，需要手动添加 MCP 连接：
 
 ```bash
-export TUNPILOT_URL=https://tunpilot.example.com
-export TUNPILOT_MCP_TOKEN=your-mcp-auth-token
+claude mcp add --transport http \
+  --header "Authorization: Bearer <your-mcp-token>" \
+  --scope user \
+  tunpilot https://<your-tunpilot-url>/mcp
 ```
 
-插件通过 `.mcp.json` 自动配置 MCP 连接：
-
-```json
-{
-  "tunpilot": {
-    "type": "http",
-    "url": "${TUNPILOT_URL}/mcp",
-    "headers": {
-      "Authorization": "Bearer ${TUNPILOT_MCP_TOKEN}"
-    }
-  }
-}
-```
+将 `<your-tunpilot-url>` 和 `<your-mcp-token>` 替换为实际值。添加后可通过 `/mcp` 确认连接状态。
 
 ## 使用
 
