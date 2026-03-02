@@ -47,8 +47,6 @@ masquerade:
   proxy:
     url: https://www.bing.com/
     rewriteHost: true
-  # listenHTTP handles both ACME HTTP-01 challenges and HTTP→HTTPS redirect
-  listenHTTP: :80
   listenHTTPS: :443
   forceHTTPS: true
 
@@ -151,5 +149,5 @@ The connection receive window (`{{CONN_WINDOW}}`) should be **at least 2.5 times
 
 Both configs use `type: proxy` with `https://www.bing.com/` as the masquerade target. The difference is in the TCP layer:
 
-- **Config A** includes `listenHTTP`, `listenHTTPS`, and `forceHTTPS` in the masquerade block. Because ACME provides a valid certificate, the server can serve a convincing HTTPS website on ports 80/443 to any browser or probe that connects over TCP. This makes the server indistinguishable from a normal web server.
+- **Config A** includes `listenHTTPS` and `forceHTTPS` in the masquerade block. Because ACME provides a valid certificate, the server can serve a convincing HTTPS website on TCP port 443 to any browser or probe. Note: `listenHTTP: :80` is intentionally omitted to avoid a port conflict with ACME's HTTP-01 challenge listener, which also needs port 80. If you need HTTP→HTTPS redirect, use a separate reverse proxy or switch ACME to `type: tls` or `type: dns`.
 - **Config B** omits these TCP masquerade options. A self-signed certificate would trigger browser warnings, which defeats the purpose of masquerading. The proxy masquerade still works for QUIC-level probes (the Hysteria2 protocol layer), but TCP visitors will get a connection refused instead of a fake website.

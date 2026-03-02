@@ -94,7 +94,7 @@ Using the probe results, build a server profile table:
 Present the server profile and confirm:
 
 - **Congestion control**: Brutal (recommended for dedicated bandwidth) vs BBR (for shared/variable bandwidth)
-- **Port hopping**: Whether to enable UDP port hopping (20000-50000 DNAT to 443) for censorship resistance
+- **Port hopping**: Whether to enable UDP port hopping (20000-50000 redirect to 443) for censorship resistance
 - **Bandwidth limits**: Up/down values based on server specs
 - **Masquerade site**: Default `https://www.bing.com/` or custom
 
@@ -109,23 +109,13 @@ Apply QUIC-optimized sysctl settings. Skip if the probe shows values are already
 ```bash
 ssh <server> bash <<'SYSCTL'
 cat > /etc/sysctl.d/99-hysteria.conf << 'EOF'
-# QUIC UDP buffers
+# QUIC/UDP buffer sizes (official Hysteria2 recommendation)
 net.core.rmem_max = 16777216
 net.core.wmem_max = 16777216
-net.core.rmem_default = 1048576
-net.core.wmem_default = 1048576
 
-# TCP/BBR
+# Queueing discipline (supports pacing needed by BBR)
 net.core.default_qdisc = fq
 net.ipv4.tcp_congestion_control = bbr
-
-# Connection backlog
-net.core.somaxconn = 4096
-net.core.netdev_max_backlog = 8192
-
-# TCP optimization
-net.ipv4.tcp_slow_start_after_idle = 0
-net.ipv4.tcp_tw_reuse = 1
 EOF
 
 sysctl -p /etc/sysctl.d/99-hysteria.conf
@@ -224,8 +214,8 @@ cat > /etc/systemd/system/hysteria-server.service.d/hardening.conf << 'EOF'
 [Service]
 LimitNOFILE=65536
 NoNewPrivileges=true
-AmbientCapabilities=CAP_NET_BIND_SERVICE
-CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW
 ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=/etc/hysteria
@@ -262,9 +252,9 @@ FIREWALL
 
 ```bash
 ssh <server> bash <<'PORTHOP'
-# DNAT range 20000-50000 to 443 for UDP port hopping
-iptables -t nat -A PREROUTING -p udp --dport 20000:50000 -j DNAT --to-destination :443
-ip6tables -t nat -A PREROUTING -p udp --dport 20000:50000 -j DNAT --to-destination :443
+# Redirect range 20000-50000 to 443 for UDP port hopping
+iptables -t nat -A PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports 443
+ip6tables -t nat -A PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports 443
 
 # Persist rules
 apt-get install -y netfilter-persistent iptables-persistent 2>/dev/null \
