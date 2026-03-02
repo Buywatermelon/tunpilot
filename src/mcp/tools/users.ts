@@ -26,13 +26,13 @@ export function register(server: McpServer, db: Db, _baseUrl: string) {
 
   server.tool(
     "create_user",
-    "Create a new user",
+    "Create a new user. IMPORTANT: Before calling this tool, you MUST confirm ALL optional parameters with the user. Present a summary table showing: username, password, quota (default: unlimited), max devices (default: 3), expiry (default: never), and which nodes to assign. Only proceed after explicit user confirmation.",
     {
       name: z.string().describe("Unique username"),
       password: z.string().describe("Hysteria2 auth password"),
       quota_bytes: z.number().optional().describe("Traffic quota in bytes (0 = unlimited)"),
       expires_at: z.string().optional().describe("Expiry datetime (null = never)"),
-      max_devices: z.number().optional().describe("Max concurrent devices"),
+      max_devices: z.number().optional().describe("Max concurrent devices (default: 3)"),
     },
     async (args) => {
       const user = createUser(db, args);
