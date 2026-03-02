@@ -14,8 +14,7 @@
 安装插件后，用自然语言驱动 Agent 完成一切：
 
 ```
-> 帮我在服务器上部署 TunPilot        ← deploy-server skill
-> 连接 TunPilot MCP                  ← setup-tunpilot skill
+> 帮我部署 TunPilot 并连接           ← getting-started skill（部署 + 连接一气呵成）
 > 部署一个新的 Hysteria2 节点         ← deploying-nodes skill
 ```
 
@@ -25,9 +24,8 @@
 
 | Skill | 触发场景 | 作用 |
 |-------|---------|------|
-| `deploy-server` | 部署/安装/更新 TunPilot 服务 | 引导在服务器上执行一键部署脚本 |
-| `setup-tunpilot` | 配置/连接 MCP | 引导执行 `claude mcp add` 完成连接 |
-| `deploying-nodes` | 部署 Hysteria2 节点 | 提供配置模板和分步操作流程 |
+| `getting-started` | 部署 TunPilot 服务 / 连接 MCP / 首次配置 | 引导一键部署 + MCP 连接 |
+| `deploying-nodes` | 部署 Hysteria2 代理节点 | 提供配置模板和分步操作流程 |
 
 ## MCP 连接后
 
