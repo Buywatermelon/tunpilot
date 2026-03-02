@@ -96,7 +96,7 @@ Present the server profile and confirm:
 - **Congestion control**: Brutal (recommended for dedicated bandwidth) vs BBR (for shared/variable bandwidth)
 - **Port hopping**: Whether to enable UDP port hopping (20000-50000 DNAT to 443) for censorship resistance
 - **Bandwidth limits**: Up/down values based on server specs
-- **Masquerade site**: Default `https://www.bing.com` or custom
+- **Masquerade site**: Default `https://www.bing.com/` or custom
 
 ---
 
