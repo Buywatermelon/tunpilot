@@ -1,16 +1,19 @@
-import { test, expect, beforeEach, describe } from "bun:test";
-import { Database } from "bun:sqlite";
-import { initDatabase } from "../db/index";
+import { test, expect, beforeEach, afterEach, describe } from "bun:test";
+import { initDatabase, type Db } from "../db/index";
 import { addNode, listNodes, getNode, updateNode, removeNode } from "./node";
 
-let db: Database;
+let db: Db;
 
 beforeEach(() => {
   db = initDatabase(":memory:");
 });
 
+afterEach(() => {
+  db?.$client?.close();
+});
+
 describe("addNode", () => {
-  test("inserts a node and returns the full record with auto-generated id and auth_secret", () => {
+  test("插入节点并返回带自动生成 ID 和 auth_secret 的完整记录", () => {
     const node = addNode(db, {
       name: "tokyo-1",
       host: "203.0.113.1",
@@ -19,9 +22,9 @@ describe("addNode", () => {
     });
 
     expect(node.id).toBeString();
-    expect(node.id.length).toBe(36); // UUID format
+    expect(node.id.length).toBe(36); // UUID 格式
     expect(node.auth_secret).toBeString();
-    expect(node.auth_secret.length).toBe(64); // 32 bytes = 64 hex chars
+    expect(node.auth_secret.length).toBe(64); // 32 字节 = 64 个十六进制字符
     expect(node.name).toBe("tokyo-1");
     expect(node.host).toBe("203.0.113.1");
     expect(node.port).toBe(443);
@@ -30,7 +33,7 @@ describe("addNode", () => {
     expect(node.created_at).toBeString();
   });
 
-  test("accepts optional fields", () => {
+  test("接受可选字段", () => {
     const node = addNode(db, {
       name: "tokyo-2",
       host: "203.0.113.2",
@@ -62,12 +65,12 @@ describe("addNode", () => {
 });
 
 describe("listNodes", () => {
-  test("returns empty array when no nodes exist", () => {
+  test("无节点时返回空数组", () => {
     const nodes = listNodes(db);
     expect(nodes).toEqual([]);
   });
 
-  test("returns all nodes", () => {
+  test("返回所有节点", () => {
     addNode(db, { name: "node-1", host: "1.1.1.1", port: 443, protocol: "hysteria2" });
     addNode(db, { name: "node-2", host: "2.2.2.2", port: 443, protocol: "hysteria2" });
 
@@ -78,7 +81,7 @@ describe("listNodes", () => {
 });
 
 describe("getNode", () => {
-  test("returns a node by id", () => {
+  test("根据 ID 返回节点", () => {
     const created = addNode(db, { name: "node-1", host: "1.1.1.1", port: 443, protocol: "hysteria2" });
     const found = getNode(db, created.id);
 
@@ -87,32 +90,32 @@ describe("getNode", () => {
     expect(found!.name).toBe("node-1");
   });
 
-  test("returns null for non-existent id", () => {
+  test("ID 不存在时返回 null", () => {
     const found = getNode(db, "non-existent-id");
     expect(found).toBeNull();
   });
 });
 
 describe("updateNode", () => {
-  test("updates provided fields only", () => {
+  test("仅更新指定字段", () => {
     const created = addNode(db, { name: "node-1", host: "1.1.1.1", port: 443, protocol: "hysteria2" });
     const updated = updateNode(db, created.id, { name: "node-1-updated", port: 8443 });
 
     expect(updated).not.toBeNull();
     expect(updated!.name).toBe("node-1-updated");
     expect(updated!.port).toBe(8443);
-    expect(updated!.host).toBe("1.1.1.1"); // unchanged
-    expect(updated!.protocol).toBe("hysteria2"); // unchanged
+    expect(updated!.host).toBe("1.1.1.1"); // 未修改
+    expect(updated!.protocol).toBe("hysteria2"); // 未修改
   });
 
-  test("returns null when updating non-existent node", () => {
+  test("更新不存在的节点时返回 null", () => {
     const updated = updateNode(db, "non-existent-id", { name: "nope" });
     expect(updated).toBeNull();
   });
 });
 
 describe("removeNode", () => {
-  test("deletes a node by id", () => {
+  test("根据 ID 删除节点", () => {
     const created = addNode(db, { name: "node-1", host: "1.1.1.1", port: 443, protocol: "hysteria2" });
     removeNode(db, created.id);
 
@@ -120,21 +123,21 @@ describe("removeNode", () => {
     expect(found).toBeNull();
   });
 
-  test("cascades delete to user_nodes", () => {
+  test("级联删除 user_nodes", () => {
     const node = addNode(db, { name: "node-1", host: "1.1.1.1", port: 443, protocol: "hysteria2" });
 
-    // Insert a user and link to this node
-    db.run("INSERT INTO users (id, name, password) VALUES ('u1', 'testuser', 'pass')");
-    db.run("INSERT INTO user_nodes (user_id, node_id) VALUES ('u1', ?)", [node.id]);
+    // 插入用户并关联到此节点
+    db.$client.run("INSERT INTO users (id, name, password) VALUES ('u1', 'testuser', 'pass')");
+    db.$client.run("INSERT INTO user_nodes (user_id, node_id) VALUES ('u1', ?)", [node.id]);
 
-    // Verify link exists
-    const before = db.query("SELECT * FROM user_nodes WHERE node_id = ?").all(node.id);
+    // 验证关联存在
+    const before = db.$client.query("SELECT * FROM user_nodes WHERE node_id = ?").all(node.id);
     expect(before).toHaveLength(1);
 
     removeNode(db, node.id);
 
-    // Link should be gone
-    const after = db.query("SELECT * FROM user_nodes WHERE node_id = ?").all(node.id);
+    // 关联应已被删除
+    const after = db.$client.query("SELECT * FROM user_nodes WHERE node_id = ?").all(node.id);
     expect(after).toHaveLength(0);
   });
 });
