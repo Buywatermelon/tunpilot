@@ -7,6 +7,7 @@
 ```bash
 /plugin marketplace add Buywatermelon/tunpilot
 /plugin install tunpilot@tunpilot
+# 重启 Claude Code 以加载插件
 ```
 
 ## 从零开始
