@@ -1,0 +1,11 @@
+{
+  "name": "tunpilot",
+  "owner": { "name": "TunPilot" },
+  "plugins": [
+    {
+      "name": "tunpilot",
+      "source": "./plugin",
+      "description": "Agent-native proxy node management with Hysteria2 deployment guides"
+    }
+  ]
+}
