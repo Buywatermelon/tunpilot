@@ -291,10 +291,10 @@ describe("getTrafficStats", () => {
     const stats = getTrafficStats(db);
 
     expect(stats).toHaveLength(2);
-    expect(stats[0].txBytes).toBe(1000);
-    expect(stats[0].rxBytes).toBe(2000);
-    expect(stats[1].txBytes).toBe(500);
-    expect(stats[1].rxBytes).toBe(600);
+    expect(stats[0]!.txBytes).toBe(1000);
+    expect(stats[0]!.rxBytes).toBe(2000);
+    expect(stats[1]!.txBytes).toBe(500);
+    expect(stats[1]!.rxBytes).toBe(600);
   });
 
   test("按 userId 筛选", () => {
@@ -314,7 +314,7 @@ describe("getTrafficStats", () => {
     const stats = getTrafficStats(db, { userId: alice.id });
 
     expect(stats).toHaveLength(1);
-    expect(stats[0].userId).toBe(alice.id);
+    expect(stats[0]!.userId).toBe(alice.id);
   });
 
   test("按 nodeId 筛选", () => {
@@ -334,7 +334,7 @@ describe("getTrafficStats", () => {
     const stats = getTrafficStats(db, { nodeId: node1.id });
 
     expect(stats).toHaveLength(1);
-    expect(stats[0].nodeId).toBe(node1.id);
+    expect(stats[0]!.nodeId).toBe(node1.id);
   });
 
   test("按日期范围筛选（from 和 to）", () => {
@@ -360,7 +360,7 @@ describe("getTrafficStats", () => {
     });
 
     expect(stats).toHaveLength(1);
-    expect(stats[0].txBytes).toBe(500);
+    expect(stats[0]!.txBytes).toBe(500);
   });
 
   test("无日志时返回空数组", () => {
@@ -393,7 +393,7 @@ describe("getTrafficStats", () => {
     });
 
     expect(stats).toHaveLength(1);
-    expect(stats[0].txBytes).toBe(100);
+    expect(stats[0]!.txBytes).toBe(100);
   });
 });
 

@@ -50,7 +50,7 @@ describe("integration: full auth flow", () => {
     });
 
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await res.json() as any;
     expect(body.ok).toBe(true);
     expect(body.id).toBe("alice");
   });
@@ -70,7 +70,7 @@ describe("integration: full auth flow", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ addr: "1.2.3.4:12345", auth: "mypass", tx: 0 }),
       });
-      const body = await res.json();
+      const body = await res.json() as any;
       expect(body.ok).toBe(true);
     }
 
@@ -80,7 +80,7 @@ describe("integration: full auth flow", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ addr: "1.2.3.4:12345", auth: "mypass", tx: 0 }),
     });
-    const body = await res.json();
+    const body = await res.json() as any;
     expect(body.ok).toBe(false);
   });
 });
@@ -104,7 +104,7 @@ describe("integration: auth rejection cases", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ addr: "1.2.3.4:12345", auth: "pass123", tx: 0 }),
     });
-    expect((await res.json()).ok).toBe(false);
+    expect((await res.json() as any).ok).toBe(false);
   });
 
   test("expired user is rejected", async () => {
@@ -116,7 +116,7 @@ describe("integration: auth rejection cases", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ addr: "1.2.3.4:12345", auth: "pass123", tx: 0 }),
     });
-    expect((await res.json()).ok).toBe(false);
+    expect((await res.json() as any).ok).toBe(false);
   });
 
   test("over-quota user is rejected", async () => {
@@ -128,7 +128,7 @@ describe("integration: auth rejection cases", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ addr: "1.2.3.4:12345", auth: "pass123", tx: 0 }),
     });
-    expect((await res.json()).ok).toBe(false);
+    expect((await res.json() as any).ok).toBe(false);
   });
 
   test("disabled node is rejected", async () => {
@@ -140,7 +140,7 @@ describe("integration: auth rejection cases", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ addr: "1.2.3.4:12345", auth: "pass123", tx: 0 }),
     });
-    expect((await res.json()).ok).toBe(false);
+    expect((await res.json() as any).ok).toBe(false);
   });
 });
 
@@ -184,7 +184,7 @@ describe("integration: subscription flow", () => {
     // Sing-box: JSON config with outbounds
     const sbRes = await req(`/sub/${sbSub.token}`);
     expect(sbRes.status).toBe(200);
-    const sbJson = await sbRes.json();
+    const sbJson = await sbRes.json() as any;
     expect(sbJson.outbounds).toBeDefined();
     const hy2Outbounds = sbJson.outbounds.filter((o: any) => o.type === "hysteria2");
     expect(hy2Outbounds).toHaveLength(2);
@@ -209,7 +209,7 @@ describe("integration: subscription flow", () => {
 
     const sub = generateSubscription(db, user.id, "singbox");
     const res = await req(`/sub/${sub.token}`);
-    const json = await res.json();
+    const json = await res.json() as any;
     const hy2 = json.outbounds.filter((o: any) => o.type === "hysteria2");
     expect(hy2).toHaveLength(1);
     expect(hy2[0].tag).toBe("active");
@@ -222,7 +222,7 @@ describe("integration: health endpoint", () => {
   test("GET /health returns 200 with status ok", async () => {
     const res = await req("/health");
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await res.json() as any;
     expect(body.status).toBe("ok");
     expect(body.timestamp).toBeDefined();
   });

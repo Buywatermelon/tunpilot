@@ -38,7 +38,7 @@ describe("POST /auth/:nodeId/:authSecret", () => {
     });
 
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await res.json() as any;
     expect(body.ok).toBe(true);
     expect(body.id).toBe("alice");
   });
@@ -53,7 +53,7 @@ describe("POST /auth/:nodeId/:authSecret", () => {
     });
 
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await res.json() as any;
     expect(body.ok).toBe(false);
   });
 
@@ -69,7 +69,7 @@ describe("POST /auth/:nodeId/:authSecret", () => {
     });
 
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await res.json() as any;
     expect(body.ok).toBe(false);
   });
 
@@ -86,7 +86,7 @@ describe("POST /auth/:nodeId/:authSecret", () => {
     });
 
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await res.json() as any;
     expect(body.ok).toBe(false);
   });
 
@@ -106,7 +106,7 @@ describe("POST /auth/:nodeId/:authSecret", () => {
     });
 
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await res.json() as any;
     expect(body.ok).toBe(false);
   });
 
@@ -123,7 +123,7 @@ describe("POST /auth/:nodeId/:authSecret", () => {
     });
 
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await res.json() as any;
     expect(body.ok).toBe(false);
   });
 
@@ -139,7 +139,7 @@ describe("POST /auth/:nodeId/:authSecret", () => {
     });
 
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await res.json() as any;
     expect(body.ok).toBe(false);
   });
 
@@ -151,7 +151,7 @@ describe("POST /auth/:nodeId/:authSecret", () => {
     });
 
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await res.json() as any;
     expect(body.ok).toBe(false);
   });
 });
@@ -190,7 +190,7 @@ describe("GET /sub/:token", () => {
 
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("application/json");
-    const json = await res.json();
+    const json = await res.json() as any;
     expect(json.outbounds).toBeDefined();
   });
 
@@ -216,7 +216,7 @@ describe("GET /health", () => {
   test("returns 200 with status ok", async () => {
     const res = await req("/health");
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = await res.json() as any;
     expect(body.status).toBe("ok");
     expect(body.timestamp).toBeDefined();
   });
