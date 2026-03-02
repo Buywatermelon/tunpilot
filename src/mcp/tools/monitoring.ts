@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Db } from "../../db/index";
 import { listNodes } from "../../services/node";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, gte, lt, sql } from "drizzle-orm";
 import { trafficLogs } from "../../db/schema";
 
 // 注册监控工具（3 个）：check_health, get_traffic_stats, get_cert_status
@@ -34,11 +34,15 @@ export function register(server: McpServer, db: Db, _baseUrl: string) {
     {
       user_id: z.string().optional().describe("Filter by user ID"),
       node_id: z.string().optional().describe("Filter by node ID"),
+      from: z.string().optional().describe("Start datetime (inclusive), e.g. 2026-03-01"),
+      to: z.string().optional().describe("End datetime (exclusive), e.g. 2026-04-01"),
     },
-    async ({ user_id, node_id }) => {
+    async ({ user_id, node_id, from, to }) => {
       const conditions = [];
       if (user_id) conditions.push(eq(trafficLogs.user_id, user_id));
       if (node_id) conditions.push(eq(trafficLogs.node_id, node_id));
+      if (from) conditions.push(gte(trafficLogs.recorded_at, from));
+      if (to) conditions.push(lt(trafficLogs.recorded_at, to));
       const where = conditions.length > 0 ? and(...conditions) : undefined;
 
       const row = db
