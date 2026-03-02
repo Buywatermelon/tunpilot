@@ -123,8 +123,9 @@ net.ipv4.tcp_congestion_control = bbr
 net.core.somaxconn = 4096
 net.core.netdev_max_backlog = 8192
 
-# Increase conntrack for port hopping
-net.netfilter.nf_conntrack_max = 131072
+# TCP optimization
+net.ipv4.tcp_slow_start_after_idle = 0
+net.ipv4.tcp_tw_reuse = 1
 EOF
 
 sysctl -p /etc/sysctl.d/99-hysteria.conf
