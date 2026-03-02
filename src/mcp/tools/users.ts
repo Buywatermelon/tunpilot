@@ -10,6 +10,7 @@ import {
   resetTraffic,
 } from "../../services/user";
 
+// 注册用户管理工具（5 个）：list_users, create_user, update_user, delete_user, reset_traffic
 export function register(server: McpServer, db: Db, _baseUrl: string) {
   server.tool(
     "list_users",

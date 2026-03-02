@@ -8,6 +8,7 @@ import {
   getSubscriptionByToken,
 } from "../../services/subscription";
 
+// 注册订阅管理工具（3 个）：generate_subscription, list_subscriptions, get_subscription_config
 export function register(server: McpServer, db: Db, baseUrl: string) {
   server.tool(
     "generate_subscription",

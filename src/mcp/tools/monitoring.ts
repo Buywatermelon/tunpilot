@@ -5,6 +5,7 @@ import { listNodes } from "../../services/node";
 import { eq, and, sql } from "drizzle-orm";
 import { trafficLogs } from "../../db/schema";
 
+// 注册监控工具（3 个）：check_health, get_traffic_stats, get_cert_status
 export function register(server: McpServer, db: Db, _baseUrl: string) {
   server.tool(
     "check_health",

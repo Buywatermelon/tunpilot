@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Db } from "../../db/index";
 import { addNode, listNodes, getNode, updateNode, removeNode } from "../../services/node";
 
+// 注册节点管理工具（5 个）：list_nodes, get_node_info, add_node, update_node, remove_node
 export function register(server: McpServer, db: Db, baseUrl: string) {
   server.tool(
     "list_nodes",
