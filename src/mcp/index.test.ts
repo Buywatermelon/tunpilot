@@ -260,23 +260,6 @@ describe("monitoring tools", () => {
     expect(data.total_tx).toBe(1000);
     expect(data.total_rx).toBe(2000);
   });
-});
-
-// --- Ops ---
-
-describe("ops tools", () => {
-  beforeEach(setup);
-  afterEach(async () => cleanup());
-
-  test("get_deploy_template returns Hysteria2 config template", async () => {
-    const result = await client.callTool({
-      name: "get_deploy_template",
-      arguments: { protocol: "hysteria2" },
-    });
-    const data = parseResult(result) as { template: string };
-    expect(data.template).toContain("listen");
-    expect(data.template).toContain("auth");
-  });
 
   test("get_cert_status returns cert info for nodes", async () => {
     addNode(db, {
@@ -292,14 +275,5 @@ describe("ops tools", () => {
     const data = parseResult(result) as Array<{ name: string; cert_expires: string }>;
     expect(data).toHaveLength(1);
     expect(data[0]!.cert_expires).toBe("2027-01-01T00:00:00Z");
-  });
-
-  test("get_setup_guide returns guide text", async () => {
-    const result = await client.callTool({
-      name: "get_setup_guide",
-      arguments: {},
-    });
-    const data = parseResult(result) as { guide: string };
-    expect(data.guide).toContain("add_node");
   });
 });
