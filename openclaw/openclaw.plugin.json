@@ -1,0 +1,18 @@
+{
+  "id": "tunpilot",
+  "name": "TunPilot",
+  "description": "Agent-native proxy node management — connect to your TunPilot MCP server for Hysteria2 node CRUD, user management, subscriptions, and monitoring.",
+  "skills": ["./skills"],
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "tunpilotUrl": { "type": "string" },
+      "mcpToken": { "type": "string" }
+    },
+    "required": ["tunpilotUrl", "mcpToken"]
+  },
+  "uiHints": {
+    "tunpilotUrl": { "label": "TunPilot URL", "placeholder": "https://tunpilot.example.com" },
+    "mcpToken": { "label": "MCP Auth Token", "sensitive": true }
+  }
+}

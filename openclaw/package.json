@@ -1,0 +1,21 @@
+{
+  "name": "@tunpilot/openclaw-plugin",
+  "version": "0.1.0",
+  "description": "TunPilot MCP integration for OpenClaw — proxy node management with Hysteria2",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "openclaw": {
+    "extensions": ["./dist/index.js"]
+  },
+  "files": ["dist", "openclaw.plugin.json", "skills", "README.md"],
+  "scripts": {
+    "build": "bun build src/index.ts --outdir dist --target node",
+    "dev": "bun build src/index.ts --outdir dist --target node --watch"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.2.3-1"
+  },
+  "keywords": ["openclaw", "mcp", "proxy", "hysteria2", "tunpilot"],
+  "license": "MIT"
+}
