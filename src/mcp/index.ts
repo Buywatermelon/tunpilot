@@ -4,7 +4,6 @@ import { register as registerNodes } from "./tools/nodes";
 import { register as registerUsers } from "./tools/users";
 import { register as registerSubscriptions } from "./tools/subscriptions";
 import { register as registerMonitoring } from "./tools/monitoring";
-import { register as registerOps } from "./tools/ops";
 
 export function createMcpServer(db: Db, baseUrl: string): McpServer {
   const server = new McpServer({
@@ -16,7 +15,6 @@ export function createMcpServer(db: Db, baseUrl: string): McpServer {
   registerUsers(server, db, baseUrl);
   registerSubscriptions(server, db, baseUrl);
   registerMonitoring(server, db, baseUrl);
-  registerOps(server, db, baseUrl);
 
   return server;
 }
