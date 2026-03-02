@@ -1,5 +1,6 @@
-import type { Database } from "bun:sqlite";
-import type { Node } from "./node";
+import { eq, and, gte, lt, sql, isNotNull } from "drizzle-orm";
+import type { Db } from "../db/index";
+import { nodes, users, trafficLogs, type Node } from "../db/schema";
 
 export interface SyncResult {
   nodeId: string;
@@ -22,8 +23,9 @@ export interface TrafficStat {
   recordedAt: string;
 }
 
+// 从单个节点同步流量数据
 export async function syncTrafficFromNode(
-  db: Database,
+  db: Db,
   node: Node
 ): Promise<SyncResult> {
   const result: SyncResult = { nodeId: node.id, synced: 0, errors: [] };
@@ -32,9 +34,7 @@ export async function syncTrafficFromNode(
   try {
     const res = await fetch(
       `http://${node.host}:${node.stats_port}/traffic?clear=1`,
-      {
-        headers: { Authorization: node.stats_secret! },
-      }
+      { headers: { Authorization: node.stats_secret! } }
     );
     if (!res.ok) {
       result.errors.push(`HTTP ${res.status} from node ${node.name}`);
@@ -46,96 +46,94 @@ export async function syncTrafficFromNode(
     return result;
   }
 
-  const insertLog = db.prepare(
-    "INSERT INTO traffic_logs (user_id, node_id, tx_bytes, rx_bytes) VALUES (?, ?, ?, ?)"
-  );
-  const updateUsed = db.prepare(
-    "UPDATE users SET used_bytes = used_bytes + ? WHERE id = ?"
-  );
-  const findUser = db.prepare("SELECT id FROM users WHERE name = ?");
-
   for (const [username, traffic] of Object.entries(data)) {
     const totalBytes = traffic.tx + traffic.rx;
     if (totalBytes === 0) continue;
 
-    const user = findUser.get(username) as { id: string } | null;
+    // 根据用户名查找用户
+    const user = db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.name, username))
+      .get();
+
     if (!user) {
       result.errors.push(`Unknown user: ${username}`);
       continue;
     }
 
-    insertLog.run(user.id, node.id, traffic.tx, traffic.rx);
-    updateUsed.run(totalBytes, user.id);
+    // 写入流量日志
+    db.insert(trafficLogs)
+      .values({
+        user_id: user.id,
+        node_id: node.id,
+        tx_bytes: traffic.tx,
+        rx_bytes: traffic.rx,
+      })
+      .run();
+
+    // 累加用户已用流量
+    db.update(users)
+      .set({ used_bytes: sql`used_bytes + ${totalBytes}` })
+      .where(eq(users.id, user.id))
+      .run();
+
     result.synced++;
   }
 
   return result;
 }
 
-export async function syncAllNodes(db: Database): Promise<SyncResult[]> {
-  const nodes = db
-    .query(
-      "SELECT * FROM nodes WHERE enabled = 1 AND stats_port IS NOT NULL"
-    )
-    .all() as Node[];
+// 同步所有已启用且配置了 stats_port 的节点
+export async function syncAllNodes(db: Db): Promise<SyncResult[]> {
+  const enabledNodes = db
+    .select()
+    .from(nodes)
+    .where(and(eq(nodes.enabled, 1), isNotNull(nodes.stats_port)))
+    .all();
 
   const results: SyncResult[] = [];
-
-  for (const node of nodes) {
+  for (const node of enabledNodes) {
     const result = await syncTrafficFromNode(db, node);
     results.push(result);
   }
-
   return results;
 }
 
-export function getTrafficStats(
-  db: Database,
-  filters?: TrafficFilters
-): TrafficStat[] {
-  const conditions: string[] = [];
-  const params: unknown[] = [];
+// 查询流量统计（支持多维度筛选）
+export function getTrafficStats(db: Db, filters?: TrafficFilters): TrafficStat[] {
+  const conditions = [];
 
-  if (filters?.userId) {
-    conditions.push("user_id = ?");
-    params.push(filters.userId);
-  }
-  if (filters?.nodeId) {
-    conditions.push("node_id = ?");
-    params.push(filters.nodeId);
-  }
-  if (filters?.from) {
-    conditions.push("recorded_at >= ?");
-    params.push(filters.from);
-  }
-  if (filters?.to) {
-    conditions.push("recorded_at < ?");
-    params.push(filters.to);
-  }
+  if (filters?.userId) conditions.push(eq(trafficLogs.user_id, filters.userId));
+  if (filters?.nodeId) conditions.push(eq(trafficLogs.node_id, filters.nodeId));
+  if (filters?.from) conditions.push(gte(trafficLogs.recorded_at, filters.from));
+  if (filters?.to) conditions.push(lt(trafficLogs.recorded_at, filters.to));
 
-  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+
   const rows = db
-    .query(
-      `SELECT user_id, node_id, tx_bytes, rx_bytes, recorded_at FROM traffic_logs ${where}`
-    )
-    .all(...params) as {
-    user_id: string;
-    node_id: string;
-    tx_bytes: number;
-    rx_bytes: number;
-    recorded_at: string;
-  }[];
+    .select({
+      user_id: trafficLogs.user_id,
+      node_id: trafficLogs.node_id,
+      tx_bytes: trafficLogs.tx_bytes,
+      rx_bytes: trafficLogs.rx_bytes,
+      recorded_at: trafficLogs.recorded_at,
+    })
+    .from(trafficLogs)
+    .where(where)
+    .all();
 
   return rows.map((r) => ({
-    userId: r.user_id,
-    nodeId: r.node_id,
-    txBytes: r.tx_bytes,
-    rxBytes: r.rx_bytes,
-    recordedAt: r.recorded_at,
+    userId: r.user_id!,
+    nodeId: r.node_id!,
+    txBytes: r.tx_bytes!,
+    rxBytes: r.rx_bytes!,
+    recordedAt: r.recorded_at!,
   }));
 }
 
-export function startTrafficSync(db: Database, intervalMs: number): Timer {
+// 启动定时流量同步
+export function startTrafficSync(db: Db, intervalMs: number): Timer {
   return setInterval(() => {
     syncAllNodes(db).catch((err) => {
       console.error("Traffic sync failed:", err);

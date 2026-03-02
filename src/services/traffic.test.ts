@@ -1,6 +1,5 @@
 import { test, expect, beforeEach, afterEach, describe } from "bun:test";
-import { Database } from "bun:sqlite";
-import { initDatabase } from "../db/index";
+import { initDatabase, type Db } from "../db/index";
 import { addNode } from "./node";
 import { createUser } from "./user";
 import {
@@ -9,9 +8,9 @@ import {
   getTrafficStats,
   startTrafficSync,
 } from "./traffic";
-import type { Node } from "./node";
+import type { Node } from "../db/schema";
 
-let db: Database;
+let db: Db;
 let originalFetch: typeof globalThis.fetch;
 
 beforeEach(() => {
@@ -21,6 +20,7 @@ beforeEach(() => {
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  db?.$client?.close();
 });
 
 function createNodeWithStats(
@@ -38,7 +38,7 @@ function createNodeWithStats(
 }
 
 describe("syncTrafficFromNode", () => {
-  test("fetches traffic data and writes to traffic_logs and updates used_bytes", async () => {
+  test("获取流量数据并写入 traffic_logs 和更新 used_bytes", async () => {
     const node = createNodeWithStats();
     const user = createUser(db, { name: "alice", password: "pass" });
 
@@ -58,22 +58,22 @@ describe("syncTrafficFromNode", () => {
     expect(result.synced).toBe(1);
     expect(result.errors).toEqual([]);
 
-    // Check traffic_logs
-    const logs = db
+    // 检查 traffic_logs
+    const logs = db.$client
       .query("SELECT * FROM traffic_logs WHERE user_id = ? AND node_id = ?")
       .all(user.id, node.id) as any[];
     expect(logs).toHaveLength(1);
     expect(logs[0].tx_bytes).toBe(1000);
     expect(logs[0].rx_bytes).toBe(2000);
 
-    // Check user used_bytes incremented
-    const updatedUser = db
+    // 检查 used_bytes 是否已累加
+    const updatedUser = db.$client
       .query("SELECT used_bytes FROM users WHERE id = ?")
       .get(user.id) as any;
     expect(updatedUser.used_bytes).toBe(3000);
   });
 
-  test("handles multiple users in a single response", async () => {
+  test("处理单次响应中的多个用户", async () => {
     const node = createNodeWithStats();
     const alice = createUser(db, { name: "alice", password: "pass" });
     const bob = createUser(db, { name: "bob", password: "pass" });
@@ -93,17 +93,17 @@ describe("syncTrafficFromNode", () => {
     expect(result.errors).toEqual([]);
 
     const aliceBytes = (
-      db.query("SELECT used_bytes FROM users WHERE id = ?").get(alice.id) as any
+      db.$client.query("SELECT used_bytes FROM users WHERE id = ?").get(alice.id) as any
     ).used_bytes;
     const bobBytes = (
-      db.query("SELECT used_bytes FROM users WHERE id = ?").get(bob.id) as any
+      db.$client.query("SELECT used_bytes FROM users WHERE id = ?").get(bob.id) as any
     ).used_bytes;
 
     expect(aliceBytes).toBe(300);
     expect(bobBytes).toBe(1100);
   });
 
-  test("records error for unknown username but continues syncing others", async () => {
+  test("记录未知用户名错误但继续同步其他用户", async () => {
     const node = createNodeWithStats();
     createUser(db, { name: "alice", password: "pass" });
 
@@ -123,7 +123,7 @@ describe("syncTrafficFromNode", () => {
     expect(result.errors[0]).toContain("unknown_user");
   });
 
-  test("skips entries with zero traffic", async () => {
+  test("跳过零流量条目", async () => {
     const node = createNodeWithStats();
     createUser(db, { name: "alice", password: "pass" });
 
@@ -140,11 +140,11 @@ describe("syncTrafficFromNode", () => {
     expect(result.synced).toBe(0);
     expect(result.errors).toEqual([]);
 
-    const logs = db.query("SELECT * FROM traffic_logs").all();
+    const logs = db.$client.query("SELECT * FROM traffic_logs").all();
     expect(logs).toHaveLength(0);
   });
 
-  test("handles fetch failure gracefully", async () => {
+  test("优雅处理 fetch 失败", async () => {
     const node = createNodeWithStats();
 
     globalThis.fetch = async () => {
@@ -159,7 +159,7 @@ describe("syncTrafficFromNode", () => {
     expect(result.errors[0]).toContain("Connection refused");
   });
 
-  test("handles non-OK HTTP response", async () => {
+  test("处理非 OK HTTP 响应", async () => {
     const node = createNodeWithStats();
 
     globalThis.fetch = async () => {
@@ -173,7 +173,7 @@ describe("syncTrafficFromNode", () => {
     expect(result.errors[0]).toContain("500");
   });
 
-  test("accumulates used_bytes across multiple syncs", async () => {
+  test("多次同步累加 used_bytes", async () => {
     const node = createNodeWithStats();
     const user = createUser(db, { name: "alice", password: "pass" });
 
@@ -186,28 +186,28 @@ describe("syncTrafficFromNode", () => {
     await syncTrafficFromNode(db, node);
     await syncTrafficFromNode(db, node);
 
-    const updatedUser = db
+    const updatedUser = db.$client
       .query("SELECT used_bytes FROM users WHERE id = ?")
       .get(user.id) as any;
     expect(updatedUser.used_bytes).toBe(6000);
 
-    const logs = db.query("SELECT * FROM traffic_logs").all();
+    const logs = db.$client.query("SELECT * FROM traffic_logs").all();
     expect(logs).toHaveLength(2);
   });
 });
 
 describe("syncAllNodes", () => {
-  test("syncs all enabled nodes with stats_port", async () => {
+  test("同步所有已启用且有 stats_port 的节点", async () => {
     const node1 = createNodeWithStats({ name: "node-1", host: "1.1.1.1" });
     const node2 = createNodeWithStats({ name: "node-2", host: "2.2.2.2" });
-    // Node without stats_port - should be skipped
+    // 无 stats_port 的节点 - 应被跳过
     addNode(db, {
       name: "node-3",
       host: "3.3.3.3",
       port: 443,
       protocol: "hysteria2",
     });
-    // Disabled node with stats_port - should be skipped
+    // 已禁用但有 stats_port 的节点 - 应被跳过
     addNode(db, {
       name: "node-4",
       host: "4.4.4.4",
@@ -233,7 +233,7 @@ describe("syncAllNodes", () => {
     expect(nodeIds).toEqual([node1.id, node2.id].sort());
   });
 
-  test("continues syncing other nodes when one fails", async () => {
+  test("一个节点失败时继续同步其他节点", async () => {
     const node1 = createNodeWithStats({ name: "node-1", host: "1.1.1.1" });
     const node2 = createNodeWithStats({ name: "node-2", host: "2.2.2.2" });
     createUser(db, { name: "alice", password: "pass" });
@@ -260,7 +260,7 @@ describe("syncAllNodes", () => {
     expect(callCount).toBe(2);
   });
 
-  test("returns empty array when no nodes have stats_port", async () => {
+  test("无节点有 stats_port 时返回空数组", async () => {
     addNode(db, {
       name: "node-1",
       host: "1.1.1.1",
@@ -274,16 +274,16 @@ describe("syncAllNodes", () => {
 });
 
 describe("getTrafficStats", () => {
-  test("returns all traffic logs when no filters", () => {
+  test("无筛选条件时返回所有流量日志", () => {
     const node = createNodeWithStats();
     const alice = createUser(db, { name: "alice", password: "pass" });
     const bob = createUser(db, { name: "bob", password: "pass" });
 
-    db.run(
+    db.$client.run(
       "INSERT INTO traffic_logs (user_id, node_id, tx_bytes, rx_bytes) VALUES (?, ?, ?, ?)",
       [alice.id, node.id, 1000, 2000]
     );
-    db.run(
+    db.$client.run(
       "INSERT INTO traffic_logs (user_id, node_id, tx_bytes, rx_bytes) VALUES (?, ?, ?, ?)",
       [bob.id, node.id, 500, 600]
     );
@@ -297,16 +297,16 @@ describe("getTrafficStats", () => {
     expect(stats[1].rxBytes).toBe(600);
   });
 
-  test("filters by userId", () => {
+  test("按 userId 筛选", () => {
     const node = createNodeWithStats();
     const alice = createUser(db, { name: "alice", password: "pass" });
     const bob = createUser(db, { name: "bob", password: "pass" });
 
-    db.run(
+    db.$client.run(
       "INSERT INTO traffic_logs (user_id, node_id, tx_bytes, rx_bytes) VALUES (?, ?, ?, ?)",
       [alice.id, node.id, 1000, 2000]
     );
-    db.run(
+    db.$client.run(
       "INSERT INTO traffic_logs (user_id, node_id, tx_bytes, rx_bytes) VALUES (?, ?, ?, ?)",
       [bob.id, node.id, 500, 600]
     );
@@ -317,16 +317,16 @@ describe("getTrafficStats", () => {
     expect(stats[0].userId).toBe(alice.id);
   });
 
-  test("filters by nodeId", () => {
+  test("按 nodeId 筛选", () => {
     const node1 = createNodeWithStats({ name: "node-1", host: "1.1.1.1" });
     const node2 = createNodeWithStats({ name: "node-2", host: "2.2.2.2" });
     const alice = createUser(db, { name: "alice", password: "pass" });
 
-    db.run(
+    db.$client.run(
       "INSERT INTO traffic_logs (user_id, node_id, tx_bytes, rx_bytes) VALUES (?, ?, ?, ?)",
       [alice.id, node1.id, 1000, 2000]
     );
-    db.run(
+    db.$client.run(
       "INSERT INTO traffic_logs (user_id, node_id, tx_bytes, rx_bytes) VALUES (?, ?, ?, ?)",
       [alice.id, node2.id, 500, 600]
     );
@@ -337,19 +337,19 @@ describe("getTrafficStats", () => {
     expect(stats[0].nodeId).toBe(node1.id);
   });
 
-  test("filters by date range (from and to)", () => {
+  test("按日期范围筛选（from 和 to）", () => {
     const node = createNodeWithStats();
     const alice = createUser(db, { name: "alice", password: "pass" });
 
-    db.run(
+    db.$client.run(
       "INSERT INTO traffic_logs (user_id, node_id, tx_bytes, rx_bytes, recorded_at) VALUES (?, ?, ?, ?, ?)",
       [alice.id, node.id, 1000, 2000, "2026-01-15 12:00:00"]
     );
-    db.run(
+    db.$client.run(
       "INSERT INTO traffic_logs (user_id, node_id, tx_bytes, rx_bytes, recorded_at) VALUES (?, ?, ?, ?, ?)",
       [alice.id, node.id, 500, 600, "2026-02-15 12:00:00"]
     );
-    db.run(
+    db.$client.run(
       "INSERT INTO traffic_logs (user_id, node_id, tx_bytes, rx_bytes, recorded_at) VALUES (?, ?, ?, ?, ?)",
       [alice.id, node.id, 300, 400, "2026-03-15 12:00:00"]
     );
@@ -363,26 +363,26 @@ describe("getTrafficStats", () => {
     expect(stats[0].txBytes).toBe(500);
   });
 
-  test("returns empty array when no logs exist", () => {
+  test("无日志时返回空数组", () => {
     const stats = getTrafficStats(db);
     expect(stats).toEqual([]);
   });
 
-  test("combines multiple filters", () => {
+  test("组合多个筛选条件", () => {
     const node1 = createNodeWithStats({ name: "node-1", host: "1.1.1.1" });
     const node2 = createNodeWithStats({ name: "node-2", host: "2.2.2.2" });
     const alice = createUser(db, { name: "alice", password: "pass" });
     const bob = createUser(db, { name: "bob", password: "pass" });
 
-    db.run(
+    db.$client.run(
       "INSERT INTO traffic_logs (user_id, node_id, tx_bytes, rx_bytes, recorded_at) VALUES (?, ?, ?, ?, ?)",
       [alice.id, node1.id, 100, 200, "2026-02-15 12:00:00"]
     );
-    db.run(
+    db.$client.run(
       "INSERT INTO traffic_logs (user_id, node_id, tx_bytes, rx_bytes, recorded_at) VALUES (?, ?, ?, ?, ?)",
       [alice.id, node2.id, 300, 400, "2026-02-15 12:00:00"]
     );
-    db.run(
+    db.$client.run(
       "INSERT INTO traffic_logs (user_id, node_id, tx_bytes, rx_bytes, recorded_at) VALUES (?, ?, ?, ?, ?)",
       [bob.id, node1.id, 500, 600, "2026-02-15 12:00:00"]
     );
@@ -398,14 +398,14 @@ describe("getTrafficStats", () => {
 });
 
 describe("startTrafficSync", () => {
-  test("returns a timer that can be cleared", () => {
+  test("返回可清除的定时器", () => {
     const timer = startTrafficSync(db, 60000);
     expect(timer).toBeDefined();
     clearInterval(timer);
   });
 
-  test("calls syncAllNodes on interval", async () => {
-    // Create a node and user so we can verify sync happened
+  test("定时调用 syncAllNodes", async () => {
+    // 创建节点和用户以验证同步已执行
     createNodeWithStats();
     createUser(db, { name: "alice", password: "pass" });
 
@@ -417,7 +417,7 @@ describe("startTrafficSync", () => {
 
     const timer = startTrafficSync(db, 50);
 
-    // Wait for at least one interval tick
+    // 等待至少一个间隔周期
     await new Promise((resolve) => setTimeout(resolve, 120));
     clearInterval(timer);
 
