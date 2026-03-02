@@ -1,12 +1,12 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { Database } from "bun:sqlite";
+import type { Db } from "../db/index";
 import { register as registerNodes } from "./tools/nodes";
 import { register as registerUsers } from "./tools/users";
 import { register as registerSubscriptions } from "./tools/subscriptions";
 import { register as registerMonitoring } from "./tools/monitoring";
 import { register as registerOps } from "./tools/ops";
 
-export function createMcpServer(db: Database, baseUrl: string): McpServer {
+export function createMcpServer(db: Db, baseUrl: string): McpServer {
   const server = new McpServer({
     name: "tunpilot",
     version: "0.1.0",

@@ -1,14 +1,11 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { Database } from "bun:sqlite";
+import type { Db } from "../../db/index";
 import { listNodes } from "../../services/node";
+import { eq, and, sql } from "drizzle-orm";
+import { trafficLogs } from "../../db/schema";
 
-interface TrafficRow {
-  total_tx: number;
-  total_rx: number;
-}
-
-export function register(server: McpServer, db: Database, _baseUrl: string) {
+export function register(server: McpServer, db: Db, _baseUrl: string) {
   server.tool(
     "check_health",
     "Check health status of all nodes",
@@ -38,19 +35,19 @@ export function register(server: McpServer, db: Database, _baseUrl: string) {
       node_id: z.string().optional().describe("Filter by node ID"),
     },
     async ({ user_id, node_id }) => {
-      let query = "SELECT COALESCE(SUM(tx_bytes), 0) as total_tx, COALESCE(SUM(rx_bytes), 0) as total_rx FROM traffic_logs WHERE 1=1";
-      const params: string[] = [];
+      const conditions = [];
+      if (user_id) conditions.push(eq(trafficLogs.user_id, user_id));
+      if (node_id) conditions.push(eq(trafficLogs.node_id, node_id));
+      const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-      if (user_id) {
-        query += " AND user_id = ?";
-        params.push(user_id);
-      }
-      if (node_id) {
-        query += " AND node_id = ?";
-        params.push(node_id);
-      }
-
-      const row = db.query(query).get(...params) as TrafficRow;
+      const row = db
+        .select({
+          total_tx: sql<number>`COALESCE(SUM(${trafficLogs.tx_bytes}), 0)`,
+          total_rx: sql<number>`COALESCE(SUM(${trafficLogs.rx_bytes}), 0)`,
+        })
+        .from(trafficLogs)
+        .where(where)
+        .get()!;
 
       return {
         content: [

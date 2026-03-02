@@ -1,17 +1,14 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { Database } from "bun:sqlite";
+import type { Db } from "../../db/index";
 import { getUser, getUserNodes } from "../../services/user";
+import {
+  generateSubscription,
+  listSubscriptions,
+  getSubscriptionByToken,
+} from "../../services/subscription";
 
-interface Subscription {
-  id: string;
-  user_id: string;
-  token: string;
-  format: string;
-  created_at: string;
-}
-
-export function register(server: McpServer, db: Database, baseUrl: string) {
+export function register(server: McpServer, db: Db, baseUrl: string) {
   server.tool(
     "generate_subscription",
     "Generate a subscription link for a user",
@@ -30,20 +27,18 @@ export function register(server: McpServer, db: Database, baseUrl: string) {
         };
       }
 
-      const id = crypto.randomUUID();
-      const token = crypto.randomUUID();
-
-      db.run(
-        "INSERT INTO subscriptions (id, user_id, token, format) VALUES (?, ?, ?, ?)",
-        [id, user_id, token, format]
-      );
-
-      const subscription_url = `${baseUrl}/sub/${token}`;
+      const sub = generateSubscription(db, user_id, format, baseUrl);
       return {
         content: [
           {
             type: "text",
-            text: JSON.stringify({ id, user_id, token, format, subscription_url }),
+            text: JSON.stringify({
+              id: sub.id,
+              user_id: sub.user_id,
+              token: sub.token,
+              format: sub.format,
+              subscription_url: sub.url,
+            }),
           },
         ],
       };
@@ -55,9 +50,7 @@ export function register(server: McpServer, db: Database, baseUrl: string) {
     "List subscriptions for a user",
     { user_id: z.string().describe("User ID") },
     async ({ user_id }) => {
-      const subs = db
-        .query("SELECT * FROM subscriptions WHERE user_id = ?")
-        .all(user_id) as Subscription[];
+      const subs = listSubscriptions(db, user_id);
       return { content: [{ type: "text", text: JSON.stringify(subs) }] };
     }
   );
@@ -67,9 +60,7 @@ export function register(server: McpServer, db: Database, baseUrl: string) {
     "Preview subscription config content (for debugging)",
     { token: z.string().describe("Subscription token") },
     async ({ token }) => {
-      const sub = db
-        .query("SELECT * FROM subscriptions WHERE token = ?")
-        .get(token) as Subscription | null;
+      const sub = getSubscriptionByToken(db, token);
 
       if (!sub) {
         return {

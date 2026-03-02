@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { Database } from "bun:sqlite";
+import type { Db } from "../../db/index";
 import {
   createUser,
   listUsers,
@@ -10,7 +10,7 @@ import {
   resetTraffic,
 } from "../../services/user";
 
-export function register(server: McpServer, db: Database, _baseUrl: string) {
+export function register(server: McpServer, db: Db, _baseUrl: string) {
   server.tool(
     "list_users",
     "List all users and their status",

@@ -1,15 +1,14 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { Database } from "bun:sqlite";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { initDatabase } from "../db/index";
+import { initDatabase, type Db } from "../db/index";
 import { createMcpServer } from "./index";
 import { addNode } from "../services/node";
 import { createUser, assignNodesToUser } from "../services/user";
 
 const BASE_URL = "https://tunpilot.example.com";
 
-let db: Database;
+let db: Db;
 let client: Client;
 let cleanup: () => Promise<void>;
 
@@ -23,7 +22,7 @@ async function setup() {
   cleanup = async () => {
     await client.close();
     await server.close();
-    db.close();
+    db.$client.close();
   };
 }
 
@@ -157,7 +156,7 @@ describe("users tools", () => {
 
   test("reset_traffic resets used_bytes", async () => {
     const user = createUser(db, { name: "alice", password: "p1" });
-    db.run(`UPDATE users SET used_bytes = 999999 WHERE id = '${user.id}'`);
+    db.$client.run(`UPDATE users SET used_bytes = 999999 WHERE id = '${user.id}'`);
     await client.callTool({ name: "reset_traffic", arguments: { id: user.id } });
 
     const result = await client.callTool({ name: "list_users", arguments: {} });
@@ -248,7 +247,7 @@ describe("monitoring tools", () => {
   test("get_traffic_stats returns traffic data", async () => {
     const user = createUser(db, { name: "alice", password: "p1" });
     const node = addNode(db, { name: "n1", host: "1.1.1.1", port: 443, protocol: "hysteria2" });
-    db.run(
+    db.$client.run(
       "INSERT INTO traffic_logs (user_id, node_id, tx_bytes, rx_bytes) VALUES (?, ?, 1000, 2000)",
       [user.id, node.id]
     );

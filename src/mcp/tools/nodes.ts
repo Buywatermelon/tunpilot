@@ -1,9 +1,9 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { Database } from "bun:sqlite";
+import type { Db } from "../../db/index";
 import { addNode, listNodes, getNode, updateNode, removeNode } from "../../services/node";
 
-export function register(server: McpServer, db: Database, baseUrl: string) {
+export function register(server: McpServer, db: Db, baseUrl: string) {
   server.tool(
     "list_nodes",
     "List all proxy nodes and their status",

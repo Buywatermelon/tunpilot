@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { Database } from "bun:sqlite";
+import type { Db } from "../../db/index";
 import { listNodes } from "../../services/node";
 
 const HY2_CONFIG_TEMPLATE = `listen: :443
@@ -49,7 +49,7 @@ const SETUP_GUIDE = `# New Node Setup Guide
 6. Verify connectivity:
    - Call check_health to confirm the node is reachable`;
 
-export function register(server: McpServer, db: Database, _baseUrl: string) {
+export function register(server: McpServer, db: Db, _baseUrl: string) {
   server.tool(
     "get_deploy_template",
     "Get Hysteria2 config template for node deployment",
