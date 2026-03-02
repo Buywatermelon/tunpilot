@@ -15,11 +15,7 @@ acme:
   domains:
     - {{DOMAIN}}
   email: admin@{{DOMAIN}}
-  listenHTTP: :80
-  listenHTTPS: :443
   dir: /etc/hysteria/acme
-
-sniGuard: strict
 
 quic:
   initStreamReceiveWindow: {{STREAM_WINDOW}}
@@ -51,6 +47,7 @@ masquerade:
   proxy:
     url: https://www.bing.com/
     rewriteHost: true
+  # listenHTTP handles both ACME HTTP-01 challenges and HTTP→HTTPS redirect
   listenHTTP: :80
   listenHTTPS: :443
   forceHTTPS: true
@@ -72,8 +69,7 @@ listen: :443
 tls:
   cert: /etc/hysteria/cert.pem
   key: /etc/hysteria/key.pem
-
-sniGuard: disable
+  sniGuard: disable
 
 quic:
   initStreamReceiveWindow: {{STREAM_WINDOW}}
@@ -133,18 +129,23 @@ trafficStats:
 
 ### BBR vs Brutal
 
-The `bandwidth` section is **commented out by default**. When omitted, Hysteria2 uses the kernel's BBR congestion control, which is the correct choice for most deployments.
+The `bandwidth` section is **commented out by default**. When omitted on the server side, the behavior depends on the client configuration:
 
-- **BBR (default)**: TCP-friendly congestion control. Works well on stable networks and does not require knowing the server's bandwidth cap. Recommended unless you have a specific reason to switch.
+- If the **client also omits** bandwidth, Hysteria2 falls back to the kernel's **BBR** congestion control.
+- If the **client specifies** bandwidth, Hysteria2 uses **Brutal** with the client-provided values.
+
+This means omitting `bandwidth` on the server does not guarantee BBR — it delegates the decision to the client.
+
+- **BBR**: TCP-friendly congestion control. Works well on stable networks and does not require knowing the server's bandwidth cap. Recommended unless you have a specific reason to switch.
 - **Brutal**: Hysteria2's custom congestion control. Ignores packet loss signals and sends at the configured rate regardless. Useful when the path has bufferbloat or artificial throttling, but **wastes bandwidth if the values are set higher than actual capacity**. Uncomment the `bandwidth` block and fill in real values only if BBR underperforms.
 
 ### QUIC Window 2.5x Ratio
 
-The connection receive window (`{{CONN_WINDOW}}`) must be **at least 2.5 times** the stream receive window (`{{STREAM_WINDOW}}`). This ratio is enforced by the QUIC specification (RFC 9000) — the connection window covers all streams multiplexed on the connection, so it must be larger than any single stream's window to avoid head-of-line blocking. The recommended values in the placeholder table already satisfy this ratio.
+The connection receive window (`{{CONN_WINDOW}}`) should be **at least 2.5 times** the stream receive window (`{{STREAM_WINDOW}}`). This is a Hysteria2-specific recommendation matching its defaults of 8 MB / 20 MB. The connection window must be larger than any single stream's window because it governs the aggregate flow across all multiplexed streams. The recommended values in the placeholder table already satisfy this ratio.
 
 ### Stats API Security
 
-`trafficStats.listen` is bound to `127.0.0.1` (loopback only), **not** `0.0.0.0`. This means only processes on the same machine can reach the stats API. TunPilot's traffic sync connects via SSH tunnel or runs co-located, so external exposure is unnecessary. Binding to `0.0.0.0` would expose user traffic data to the public internet even with a secret, since the secret is transmitted in query parameters over unencrypted HTTP.
+`trafficStats.listen` is bound to `127.0.0.1` (loopback only), **not** `0.0.0.0`. This means only processes on the same machine can reach the stats API. TunPilot's traffic sync connects via SSH tunnel or runs co-located, so external exposure is unnecessary. Binding to `0.0.0.0` would expose user traffic data to the public internet even with a secret, since the secret is transmitted via the `Authorization` header over unencrypted HTTP.
 
 ### Masquerade: Config A vs Config B
 
