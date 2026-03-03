@@ -3,16 +3,19 @@ name: testing-nodes
 description: Use when testing proxy node quality, running diagnostics, or generating a comprehensive node health report.
 metadata:
   openclaw:
+    requires:
+      bins:
+        - ssh
     emoji: "🔬"
     homepage: https://github.com/Buywatermelon/tunpilot
 ---
 
 # TunPilot Node Diagnostics
 
-Run dual-dimension diagnostics on proxy nodes via SSH: [IPQuality](https://github.com/xykt/IPQuality) for IP reputation (risk scores, streaming unlock, blacklists) and [NetQuality](https://github.com/xykt/NetQuality) for network performance (BGP, latency, speed, routing). Both tools require zero API keys.
+Run dual-dimension diagnostics on proxy nodes via direct SSH from the local machine: [IPQuality](https://github.com/xykt/IPQuality) for IP reputation (risk scores, streaming unlock, blacklists) and [NetQuality](https://github.com/xykt/NetQuality) for network performance (BGP, latency, speed, routing). Both tools require zero API keys.
 
 **Prerequisites:**
-- Node must have `ssh_user` configured (and SSH key access from the TunPilot server)
+- Node must have `ssh_user` configured (and SSH key access from the local machine)
 - IPQuality dependencies: `jq curl bc netcat-openbsd dnsutils iproute2`
 - NetQuality dependencies: `iperf3 mtr` (plus `speedtest`, `nexttrace` auto-installed by the script with `-y` flag)
 
@@ -30,17 +33,33 @@ Accept:
 
 ## Phase 2: Run Diagnostics
 
-For each target node, run both diagnostics **sequentially** (not in parallel), because both SSH to the same node and network tests would interfere with each other:
+For each target node, get `ssh_user`, `host`, and `ssh_port` from the `list_nodes` result.
 
-1. **First**: `test_node_ipquality(node_id)` — faster, ~60-120s. Returns structured JSON with sections: Head, Info, Type, Score, Factor, Media, Mail.
-2. **Then**: `test_node_netquality(node_id)` — slower, 3-5 min in full mode. Returns structured JSON with sections: Head, BGP, Local, Connectivity, Delay, Speedtest, Transfer.
+### 2.1 IPQuality (~60-120s)
 
-Available modes for `test_node_netquality`:
-- `full` (default) — all 7 modules: BGP, NAT, Tier-1, latency, domestic speed, international interconnection. Takes 3-5 min.
-- `ping` — latency only (Delay section). Takes ~30s. Good for quick routing check.
-- `low` — skip speedtest (no Speedtest/Transfer sections). Takes ~2 min.
+```bash
+ssh -p <ssh_port> <ssh_user>@<host> "bash <(curl -sL IP.Check.Place) -j -4"
+```
 
-If testing **multiple nodes**, you can run different nodes in parallel (since they SSH to different hosts), but always run IPQuality before NetQuality on the same node.
+The output contains progress text followed by a JSON object. Extract the JSON (everything from the first `{` to the end) for report rendering.
+
+### 2.2 NetQuality
+
+Available modes:
+- **full** (default, 3-5 min): `bash <(curl -sL Net.Check.Place) -j -4 -y`
+- **ping** (~30s): `bash <(curl -sL Net.Check.Place) -j -4 -y -P`
+- **low** (~2 min): `bash <(curl -sL Net.Check.Place) -j -4 -y -L`
+
+```bash
+ssh -p <ssh_port> <ssh_user>@<host> "bash <(curl -sL Net.Check.Place) -j -4 -y"
+```
+
+Same JSON extraction as IPQuality.
+
+### Parallelization
+
+- **Different nodes**: run in parallel (separate SSH sessions to different hosts)
+- **Same node**: run sequentially (IPQuality first, then NetQuality) — network tests would interfere with each other
 
 ---
 
@@ -52,7 +71,7 @@ For each node, present results in two sections: IP Quality first, then Network Q
 
 ---
 
-### IP Quality (from `test_node_ipquality`)
+### IP Quality (from IPQuality SSH)
 
 #### IP Information
 
@@ -176,7 +195,7 @@ Major mail providers:
 
 ---
 
-### Network Quality (from `test_node_netquality`)
+### Network Quality (from NetQuality SSH)
 
 #### BGP Information
 
@@ -422,6 +441,4 @@ When comparing multiple nodes, explicitly state:
 | Tool | Use When |
 |------|----------|
 | `list_nodes` | See all registered nodes and their ssh_user config |
-| `test_node_ipquality` | Run IP reputation check (~60-120s per node) |
-| `test_node_netquality` | Run network quality test (full: 3-5 min, ping: ~30s, low: ~2 min) |
 | `check_health` | Quick health check before running diagnostics |
