@@ -162,12 +162,11 @@ Restricts port 3000 to only your IP address.
 
 ## What's Next
 
-After connecting, the user has 22 MCP tools across 6 categories:
+After connecting, the user has 20 MCP tools across 5 categories:
 - **Nodes** (4): list_nodes, add_node, update_node, remove_node
 - **Users** (7): list_users, create_user, update_user, delete_user, reset_traffic, assign_nodes, list_user_nodes
 - **Subscriptions** (4): generate_subscription, list_subscriptions, delete_subscription, get_subscription_config
 - **Monitoring** (2): check_health, get_traffic_stats
 - **Settings** (3): set_setting, list_settings, delete_setting
-- **Diagnostics** (2): test_node_ipquality, test_node_netquality
 
 Next step: deploy Hysteria2 proxy nodes using the `deploying-nodes` skill.

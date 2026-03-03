@@ -71,7 +71,7 @@ For each node, present results in two sections: IP Quality first, then Network Q
 
 ---
 
-### IP Quality (from `test_node_ipquality`)
+### IP Quality (from IPQuality SSH)
 
 #### IP Information
 
@@ -195,7 +195,7 @@ Major mail providers:
 
 ---
 
-### Network Quality (from `test_node_netquality`)
+### Network Quality (from NetQuality SSH)
 
 #### BGP Information
 

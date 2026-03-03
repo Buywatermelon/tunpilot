@@ -21,13 +21,12 @@ src/
 ├── http/index.ts         # HTTP routes: /auth/:nodeId/:authSecret, /sub/:token, /health
 ├── mcp/
 │   ├── index.ts          # MCP server factory
-│   └── tools/            # 21 MCP tools in 6 groups
+│   └── tools/            # 20 MCP tools in 5 groups
 │       ├── nodes.ts      # Node CRUD (4 tools)
 │       ├── users.ts      # User CRUD (7 tools)
 │       ├── subscriptions.ts  # Subscription management (4 tools)
 │       ├── monitoring.ts # Health check & traffic stats (2 tools)
-│       ├── settings.ts   # Settings management (3 tools)
-│       └── diagnostics.ts # Node diagnostics (1 tool: test_node_ipquality)
+│       └── settings.ts   # Settings management (3 tools)
 └── services/             # Business logic layer
     ├── auth.ts           # 4-step Hysteria2 auth callback
     ├── node.ts           # Node CRUD
@@ -35,7 +34,6 @@ src/
     ├── subscription.ts   # Subscription lifecycle
     ├── settings.ts       # Settings CRUD (API key storage)
     ├── traffic.ts        # Traffic sync from nodes + stats query
-    ├── ipquality.ts      # IPQuality SSH runner (xykt/IPQuality script)
     └── formats/          # Subscription format renderers (Format Registry pattern)
         ├── index.ts      # Registry: registerFormat() / getFormat()
         ├── shadowrocket.ts
@@ -75,7 +73,7 @@ Bun auto-loads `.env` — no dotenv needed.
 
 - **Auth flow**: Hysteria2 node → POST `/auth/:nodeId/:authSecret` → validate node → lookup user by password → check status/quota/expiry → check node permission
 - **Subscription formats**: implement `SubscriptionFormat` interface, call `registerFormat()` — auto-discovered on import
-- **Diagnostics**: single `test_node_ipquality` tool runs [xykt/IPQuality](https://github.com/xykt/IPQuality) script on node via SSH — queries 10 IP risk databases with zero API keys
+- **Diagnostics**: handled by `testing-nodes` skill via direct SSH from the local machine — runs [xykt/IPQuality](https://github.com/xykt/IPQuality) and [xykt/NetQuality](https://github.com/xykt/NetQuality) on nodes
 - **MCP sessions**: per-client `McpServer` instances with 30-min TTL auto-cleanup
 - **Traffic sync**: periodic fetch from nodes' stats API → atomic transaction (insert logs + update used_bytes)
 - **Cascading deletes**: all FK relationships use ON DELETE CASCADE
