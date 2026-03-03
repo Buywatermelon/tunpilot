@@ -133,11 +133,21 @@ Verify installation:
 ssh <server> "hysteria version"
 ```
 
-### 2.3 TLS Certificate
+### 2.3 Install Diagnostic Dependencies
+
+Install tools required by the IPQuality diagnostic script:
+
+```bash
+ssh <server> "apt-get update -qq && apt-get install -y -qq jq curl bc netcat-openbsd dnsutils iproute2"
+```
+
+These are needed for the `test_node_ipquality` diagnostic tool to work without prompting for interactive installation.
+
+### 2.4 TLS Certificate
 
 **Option A — With domain (ACME handled by Hysteria2 config):**
 
-ACME is configured directly in the Hysteria2 `config.yaml` (see Phase 2.5). There is no separate `hysteria cert` command needed. Just ensure port 80 is open for the HTTP-01 challenge:
+ACME is configured directly in the Hysteria2 `config.yaml` (see Phase 2.6). There is no separate `hysteria cert` command needed. Just ensure port 80 is open for the HTTP-01 challenge:
 
 ```bash
 ssh <server> bash <<'ACME_PREP'
@@ -161,7 +171,7 @@ openssl req -x509 -newkey ec \
 SELFSIGN
 ```
 
-### 2.4 Register Node in TunPilot
+### 2.5 Register Node in TunPilot
 
 Use the `add_node` MCP tool. This returns the `auth_callback_url` needed for the Hysteria2 config.
 
@@ -184,7 +194,7 @@ Recommended optional parameters:
 
 **Save the returned `auth_callback_url`** — it looks like `http://<tunpilot-ip>:3000/auth/<node-id>/<auth-secret>`.
 
-### 2.5 Write Production Config
+### 2.6 Write Production Config
 
 Read the config template from `hysteria2-template.md` in this skill directory. Choose the appropriate config variant:
 
@@ -201,7 +211,7 @@ CONF"
 
 Adjust `bandwidth` based on the server's actual network capacity and the user's confirmed choices from Phase 1.5.
 
-### 2.6 Systemd Hardening
+### 2.7 Systemd Hardening
 
 Create a systemd drop-in to harden the Hysteria2 service:
 
@@ -224,7 +234,7 @@ systemctl daemon-reload
 SYSTEMD
 ```
 
-### 2.7 Firewall
+### 2.8 Firewall
 
 Open required ports using the firewall type detected in Phase 1.3:
 
@@ -262,7 +272,7 @@ netfilter-persistent save 2>/dev/null || service iptables save 2>/dev/null
 PORTHOP
 ```
 
-### 2.8 Start Service
+### 2.9 Start Service
 
 ```bash
 ssh <server> "systemctl enable --now hysteria-server && sleep 2 && systemctl is-active hysteria-server"
@@ -344,12 +354,11 @@ Present a final report to the user:
 | Tool | Use When |
 |------|----------|
 | `list_nodes` | See all registered nodes |
-| `get_node_info` | Inspect a specific node's details |
-| `add_node` | Register a new node (Phase 2.4) |
+| `add_node` | Register a new node (Phase 2.5) |
 | `update_node` | Change node config (port, SNI, enable/disable) |
 | `remove_node` | Delete a node (cascades user assignments) |
 | `check_health` | Verify all nodes are reachable |
-| `get_cert_status` | Check TLS certificate expiry dates |
 | `get_traffic_stats` | Query traffic usage by node or user |
 | `assign_nodes` | Grant a user access to specific nodes |
 | `generate_subscription` | Generate client subscription link for a user |
+| `test_node_ipquality` | Run IP quality diagnostic on a node |
