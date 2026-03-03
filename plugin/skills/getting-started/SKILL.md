@@ -1,7 +1,6 @@
 ---
 name: getting-started
 description: Use when the user wants to deploy TunPilot server, connect MCP to Claude Code, update an existing installation, or set up TunPilot for the first time.
-version: 0.3.0
 metadata:
   openclaw:
     requires:

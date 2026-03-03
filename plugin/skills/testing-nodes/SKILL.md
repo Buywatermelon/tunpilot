@@ -1,7 +1,6 @@
 ---
 name: testing-nodes
 description: Use when testing proxy node quality, running diagnostics, or generating a comprehensive node health report.
-version: 1.0.0
 metadata:
   openclaw:
     emoji: "🔬"

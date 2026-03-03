@@ -1,7 +1,6 @@
 ---
 name: deploying-nodes
 description: Use when deploying a new Hysteria2 proxy node, configuring TLS certificates, registering nodes in TunPilot, or performing node operations.
-version: 1.0.0
 metadata:
   openclaw:
     requires:
