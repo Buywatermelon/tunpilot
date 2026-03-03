@@ -9,11 +9,12 @@ metadata:
 
 # TunPilot Node Diagnostics
 
-Run comprehensive IP quality check on proxy nodes via SSH using [IPQuality](https://github.com/xykt/IPQuality). Queries 10 IP risk databases, checks streaming media unlock, and email blacklists — zero API keys required.
+Run dual-dimension diagnostics on proxy nodes via SSH: [IPQuality](https://github.com/xykt/IPQuality) for IP reputation (risk scores, streaming unlock, blacklists) and [NetQuality](https://github.com/xykt/NetQuality) for network performance (BGP, latency, speed, routing). Both tools require zero API keys.
 
 **Prerequisites:**
 - Node must have `ssh_user` configured (and SSH key access from the TunPilot server)
-- Node must have diagnostic dependencies installed: `jq curl bc netcat-openbsd dnsutils iproute2`
+- IPQuality dependencies: `jq curl bc netcat-openbsd dnsutils iproute2`
+- NetQuality dependencies: `iperf3 mtr` (plus `speedtest`, `nexttrace` auto-installed by the script with `-y` flag)
 
 ---
 
@@ -29,11 +30,17 @@ Accept:
 
 ## Phase 2: Run Diagnostics
 
-For each target node, call `test_node_ipquality(node_id)`.
+For each target node, run both diagnostics **sequentially** (not in parallel), because both SSH to the same node and network tests would interfere with each other:
 
-This runs the IPQuality script on the node via SSH (~60-120s). It returns structured JSON with sections: Head, Info, Type, Score, Factor, Media, Mail.
+1. **First**: `test_node_ipquality(node_id)` — faster, ~60-120s. Returns structured JSON with sections: Head, Info, Type, Score, Factor, Media, Mail.
+2. **Then**: `test_node_netquality(node_id)` — slower, 3-5 min in full mode. Returns structured JSON with sections: Head, BGP, Local, Connectivity, Delay, Speedtest, Transfer.
 
-If testing multiple nodes, run them in parallel.
+Available modes for `test_node_netquality`:
+- `full` (default) — all 7 modules: BGP, NAT, Tier-1, latency, domestic speed, international interconnection. Takes 3-5 min.
+- `ping` — latency only (Delay section). Takes ~30s. Good for quick routing check.
+- `low` — skip speedtest (no Speedtest/Transfer sections). Takes ~2 min.
+
+If testing **multiple nodes**, you can run different nodes in parallel (since they SSH to different hosts), but always run IPQuality before NetQuality on the same node.
 
 ---
 
@@ -41,7 +48,11 @@ If testing multiple nodes, run them in parallel.
 
 ### 3.1 Single Node Report
 
-For each node, present results using this structure:
+For each node, present results in two sections: IP Quality first, then Network Quality.
+
+---
+
+### IP Quality (from `test_node_ipquality`)
 
 #### IP Information
 
@@ -163,6 +174,124 @@ Major mail providers:
 | QQ | {yes/no} |
 | 163 | {yes/no} |
 
+---
+
+### Network Quality (from `test_node_netquality`)
+
+#### BGP Information
+
+| Item | Value |
+|------|-------|
+| ASN | AS{BGP.ASN} — {BGP.Organization} |
+| Prefix | {BGP.Prefix} ({BGP.IPinTotal} IPs total, {BGP.IPActive} active) |
+| RIR | {BGP.RIR} |
+| Country | {BGP.Country} |
+| Registered | {BGP.RegDate} |
+| Upstreams | {BGP.UpstreamsCount} |
+| Peers | {BGP.PeersCount} |
+| IX Count | {BGP.IXCount} |
+
+#### Local Network Policy
+
+| Item | Value |
+|------|-------|
+| NAT Type | {Local.NAT} — {Local.NATDescribe} |
+| Mapping | {Local.Mapping} |
+| Filter | {Local.Filter} |
+| TCP Congestion Control | {Local.TCPCongestionControl} |
+| Queue Discipline | {Local.QueueDiscipline} |
+
+**NAT Type Interpretation:**
+
+| NAT Type | Chinese | Impact |
+|----------|---------|--------|
+| Full Cone | 全锥形 | Best — ideal for P2P, gaming, and VoIP |
+| Restricted Cone | 受限锥形 | Good — works for most applications |
+| Port Restricted Cone | 端口受限锥形 | OK — some P2P may have issues |
+| Symmetric | 对称型 | Worst — problematic for P2P and gaming, NAT traversal difficult |
+
+**TCP Congestion Control:**
+
+| Algorithm | Notes |
+|-----------|-------|
+| `bbr` | Recommended for proxy servers — best throughput on lossy/long-distance links |
+| `cubic` | Linux default — adequate but suboptimal for high-latency proxy use |
+| `hybla` | Designed for high-latency satellite links — good alternative for long-distance |
+
+#### Tier-1 Connectivity
+
+| ASN | Organization | Tier-1 | Upstream |
+|-----|-------------|--------|----------|
+| {Connectivity[].ASN} | {Connectivity[].Org} | {IsTier1: Yes/No} | {IsUpstream: Yes/No} |
+
+Highlight entries where `IsUpstream` is true — these are the node's direct transit providers.
+
+**Interpretation:** More Tier-1 upstreams = better international connectivity and redundancy. A node with direct Tier-1 upstream (e.g., Cogent AS174, Lumen AS3356, NTT AS2914) typically has lower latency and more stable international routing.
+
+#### Three-Network Latency (31 Provinces)
+
+**Key Regions Summary** (show these first):
+
+| Province | CT (ms) | CU (ms) | CM (ms) |
+|----------|---------|---------|---------|
+| 北京 BJ | {CT.Average} | {CU.Average} | {CM.Average} |
+| 上海 SH | {CT.Average} | {CU.Average} | {CM.Average} |
+| 广东 GD | {CT.Average} | {CU.Average} | {CM.Average} |
+| 浙江 ZJ | {CT.Average} | {CU.Average} | {CM.Average} |
+| 江苏 JS | {CT.Average} | {CU.Average} | {CM.Average} |
+| 四川 SC | {CT.Average} | {CU.Average} | {CM.Average} |
+
+**Latency Rating Guide:**
+
+| Range | Rating | User Experience |
+|-------|--------|-----------------|
+| <50ms | Excellent | Imperceptible delay |
+| 50-100ms | Good | Smooth browsing and video |
+| 100-200ms | Fair | Noticeable on interactive apps |
+| 200-500ms | Poor | Laggy, affects real-time use |
+| >500ms / 0 | Timeout | Route broken or severely congested |
+
+**Analysis Instructions:**
+- Calculate per-ISP national average across all provinces
+- Identify which ISP has the best (lowest) average latency for this node
+- Flag provinces where Average = "0" — this means timeout (route broken), not 0ms latency
+- Flag provinces with anomalously high values (>3x the national average for that ISP)
+- Note: CT = China Telecom, CU = China Unicom, CM = China Mobile
+
+**Full 31-Province Table** (present when user asks for detailed view or "show all provinces"):
+
+| Province | CT (ms) | CU (ms) | CM (ms) |
+|----------|---------|---------|---------|
+| {Delay[].Name} | {CT.Average} | {CU.Average} | {CM.Average} |
+| ... | ... | ... | ... |
+
+#### Domestic Speed Test
+
+Convert raw values to Mbps if in bytes/s format: `value / 1024 / 1024 * 8`.
+
+| City | Provider | Upload (Mbps) | Download (Mbps) |
+|------|----------|---------------|-----------------|
+| {Speedtest[].City} | {Speedtest[].Provider} | {SendSpeed} | {ReceiveSpeed} |
+
+#### International Interconnection
+
+Convert raw values to Mbps if in bytes/s format: `value / 1024 / 1024 * 8`.
+
+| City | Upload (Mbps) | Download (Mbps) | Send Retransmits | Recv Retransmits | Latency (ms) |
+|------|---------------|-----------------|------------------|------------------|--------------|
+| {Transfer[].City} | {SendSpeed} | {ReceiveSpeed} | {SendRetransmits} | {ReceiveRetransmits} | {Delay.Average} |
+
+**Speed Rating:**
+
+| Speed | Rating |
+|-------|--------|
+| >50 Mbps | Excellent |
+| 10-50 Mbps | Good |
+| 1-10 Mbps | Fair |
+| <1 Mbps | Poor |
+
+**Retransmit Analysis:** High retransmit counts (>10000) indicate a congested or lossy path. This often points to throttling by intermediate ISPs or overloaded peering points.
+
 ### 3.2 Multi-Node Comparison (when testing 2+ nodes)
 
 Present a side-by-side comparison table:
@@ -185,6 +314,13 @@ Present a side-by-side comparison table:
 | **TikTok** | {status} | {status} | |
 | **Port 25** | {open/closed} | {open/closed} | |
 | **DNS Blacklist** | {blacklisted} | {blacklisted} | |
+| **Best ISP** | {CT/CU/CM} | {CT/CU/CM} | |
+| **Avg Latency (CT)** | {ms} | {ms} | |
+| **Avg Latency (CU)** | {ms} | {ms} | |
+| **Avg Latency (CM)** | {ms} | {ms} | |
+| **HK Speed** | {Mbps} | {Mbps} | |
+| **Tokyo Speed** | {Mbps} | {Mbps} | |
+| **LA Speed** | {Mbps} | {Mbps} | |
 
 ---
 
@@ -192,7 +328,7 @@ Present a side-by-side comparison table:
 
 Analyze each node and provide specific, actionable recommendations based on observed patterns. Don't use generic advice — reference actual data from the report.
 
-### Analysis Patterns
+### IP Quality Patterns
 
 Identify which pattern(s) apply to each node and explain accordingly:
 
@@ -225,12 +361,43 @@ Identify which pattern(s) apply to each node and explain accordingly:
 - Port 25: closed, all mail providers unreachable
 - Recommendation: "Port 25 (SMTP) is blocked by the hosting provider — this is standard practice for cloud/VPS providers to prevent spam. Email sending is not possible from this IP. This does not affect proxy usage."
 
+### Network Quality Patterns
+
+**Pattern: Premium Network**
+- Low latency across all three ISPs (<100ms national average)
+- TCP congestion control: BBR
+- NAT: Full Cone or no NAT
+- International speed: >50 Mbps to major cities
+- Recommendation: "Excellent network quality. Low latency to all three Chinese ISPs, BBR congestion control, and strong international throughput. This node is well-suited for latency-sensitive applications."
+
+**Pattern: CT-Optimized (CN2/CN2 GIA)**
+- CT latency significantly lower than CU and CM (e.g., CT <80ms while CU/CM >150ms)
+- Few or no CT timeout provinces
+- Recommendation: "This node appears to use premium China Telecom routing (likely CN2 or CN2 GIA). CT users will have the best experience. CU and CM users may see higher latency due to non-optimized peering."
+
+**Pattern: CU-Optimized (AS9929/AS4837)**
+- CU latency lowest among the three ISPs
+- CT and CM latency noticeably higher
+- Recommendation: "This node has optimized China Unicom routing (likely AS9929 or AS4837 premium). CU users will have the best experience. Consider pairing with a CT-optimized node for full coverage."
+
+**Pattern: CM-Optimized (CMIN2/CMI)**
+- CM latency lowest among the three ISPs
+- CT and CU latency higher
+- Recommendation: "This node has optimized China Mobile routing (likely CMIN2 or CMI). CM users will have the best experience. China Mobile's international backbone has improved significantly — this is a good choice for CM-heavy user bases."
+
+**Pattern: Poor Routing**
+- High latency with many timeout provinces (Average = "0")
+- High TCP retransmits on international paths (>10000)
+- Recommendation: "This node has routing issues. {N} provinces show timeouts, and international paths show high retransmit rates. This suggests congested or broken peering. Consider switching to a provider with better China connectivity."
+
 ### Multi-Node Recommendation
 
 When comparing multiple nodes, explicitly state:
 - Which node has better overall IP quality and why
 - Which node is better for specific use cases (streaming, general browsing, ChatGPT)
 - Any notable differences (e.g., "Node A unlocks TikTok but B doesn't")
+- Which node has better network performance for each ISP (CT/CU/CM)
+- Optimal node assignment per user based on their ISP
 
 ---
 
@@ -242,8 +409,11 @@ When comparing multiple nodes, explicitly state:
 | `SSH command failed (exit 1)` with empty output | SSH connected but command failed | Check if bash is available on the node. Try: `ssh <user>@<host> "which bash"` |
 | "Invalid input, script exited" | IPQuality script dependencies missing | Install deps: `ssh <server> "apt-get update -qq && apt-get install -y -qq jq curl bc netcat-openbsd dnsutils iproute2"` |
 | "No JSON found in output" | Script ran but produced no JSON | Script may have failed silently. Run manually: `ssh <user>@<host> "bash <(curl -sL IP.Check.Place) -j -4"` and check output |
-| Tool times out (>120s) | Slow network or DNS issues on node | Check node's internet connectivity: `ssh <user>@<host> "curl -sL ifconfig.me"`. DNS blacklist check is usually the slowest part |
+| IPQuality times out (>120s) | Slow network or DNS issues on node | Check node's internet connectivity: `ssh <user>@<host> "curl -sL ifconfig.me"`. DNS blacklist check is usually the slowest part |
 | `IPQS: null` in scores | IPQS API unreachable from node | Not a problem — just means IPQS couldn't be queried. Other 5 score providers still give useful data |
+| NetQuality timeout (>10 min) | Full mode too slow for this server | Use `ping` mode for quick latency check, or `low` mode to skip speedtest |
+| iperf3 errors in NetQuality | `iperf3` not installed on the node | Install: `ssh <server> "apt-get update -qq && apt-get install -y -qq iperf3 mtr"` |
+| "speedtest not found" in NetQuality | speedtest CLI missing | Will be auto-installed on next run (the `-y` flag enables auto-install). If it persists, install manually: `ssh <server> "curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | bash && apt-get install -y speedtest"` |
 
 ---
 
@@ -252,5 +422,6 @@ When comparing multiple nodes, explicitly state:
 | Tool | Use When |
 |------|----------|
 | `list_nodes` | See all registered nodes and their ssh_user config |
-| `test_node_ipquality` | Run the diagnostic check (~60-120s per node) |
+| `test_node_ipquality` | Run IP reputation check (~60-120s per node) |
+| `test_node_netquality` | Run network quality test (full: 3-5 min, ping: ~30s, low: ~2 min) |
 | `check_health` | Quick health check before running diagnostics |
