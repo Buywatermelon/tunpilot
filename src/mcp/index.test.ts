@@ -291,3 +291,54 @@ describe("settings tools", () => {
     expect(data).toHaveLength(0);
   });
 });
+
+// --- Diagnostics ---
+
+describe("diagnostics tools", () => {
+  beforeEach(setup);
+  afterEach(async () => cleanup());
+
+  test("check_node_ip returns skipped when no API key", async () => {
+    const node = addNode(db, { name: "n1", host: "1.1.1.1", port: 443, protocol: "hysteria2" });
+    const result = await client.callTool({
+      name: "check_node_ip",
+      arguments: { node_id: node.id },
+    });
+    const data = parseResult(result) as { provider: string; skipped: boolean };
+    expect(data.provider).toBe("ipinfo");
+    expect(data.skipped).toBe(true);
+  });
+
+  test("check_node_ip returns error for invalid node_id", async () => {
+    const result = await client.callTool({
+      name: "check_node_ip",
+      arguments: { node_id: "nonexistent" },
+    });
+    expect(result.isError).toBe(true);
+  });
+
+  test("check_ip_quality returns results from all providers", async () => {
+    const node = addNode(db, { name: "n1", host: "1.1.1.1", port: 443, protocol: "hysteria2" });
+    const result = await client.callTool({
+      name: "check_ip_quality",
+      arguments: { node_id: node.id },
+    });
+    const data = parseResult(result) as { results: Array<{ provider: string; skipped: boolean }> };
+    // All should be skipped (no API keys configured)
+    expect(data.results.length).toBeGreaterThanOrEqual(1);
+    expect(data.results.every(r => r.skipped)).toBe(true);
+  });
+
+  test("test_node_connectivity tests TCP handshake", async () => {
+    const node = addNode(db, { name: "n1", host: "1.1.1.1", port: 443, protocol: "hysteria2" });
+    const result = await client.callTool({
+      name: "test_node_connectivity",
+      arguments: { node_id: node.id },
+    });
+    const data = parseResult(result) as { provider: string; data: { reachable: boolean } };
+    expect(data.provider).toBe("connectivity");
+    // 1.1.1.1:443 should be reachable (Cloudflare DNS)
+    // But in test environment it may not be, so just check structure
+    expect(typeof data.data.reachable).toBe("boolean");
+  });
+});
