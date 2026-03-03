@@ -128,7 +128,7 @@ describe("runNetQuality", () => {
     await expect(runNetQuality("1.2.3.4", "root")).rejects.toThrow("Failed to parse NetQuality JSON");
   });
 
-  test("does not override StrictHostKeyChecking", async () => {
+  test("includes StrictHostKeyChecking=accept-new", async () => {
     let capturedArgs: string[] = [];
     Bun.spawn = ((args: string[]) => {
       capturedArgs = args;
@@ -141,7 +141,7 @@ describe("runNetQuality", () => {
     }) as unknown as typeof Bun.spawn;
 
     await runNetQuality("1.2.3.4", "root", 22);
-    expect(capturedArgs.join(" ")).not.toContain("StrictHostKeyChecking");
+    expect(capturedArgs.join(" ")).toContain("StrictHostKeyChecking=accept-new");
     expect(capturedArgs.join(" ")).toContain("ConnectTimeout");
   });
 

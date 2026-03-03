@@ -98,7 +98,7 @@ export async function runNetQuality(
   const { flags, timeout: timeoutMs } = MODE_CONFIG[mode];
 
   const proc = Bun.spawn(
-    ["ssh", "-p", String(sshPort), "-o", "ConnectTimeout=10", `${sshUser}@${host}`, `bash <(curl -sL Net.Check.Place) ${flags}`],
+    ["ssh", "-p", String(sshPort), "-o", "ConnectTimeout=10", "-o", "StrictHostKeyChecking=accept-new", `${sshUser}@${host}`, `bash <(curl -sL Net.Check.Place) ${flags}`],
     { stdout: "pipe", stderr: "pipe" },
   );
 
