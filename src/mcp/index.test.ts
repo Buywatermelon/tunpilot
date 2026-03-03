@@ -256,3 +256,38 @@ describe("monitoring tools", () => {
     expect(data[0]!.cert_expires).toBe("2027-01-01T00:00:00Z");
   });
 });
+
+// --- Settings ---
+
+describe("settings tools", () => {
+  beforeEach(setup);
+  afterEach(async () => cleanup());
+
+  test("set_setting and list_settings", async () => {
+    await client.callTool({
+      name: "set_setting",
+      arguments: { key: "ipinfo_token", value: "tok_test123" },
+    });
+
+    const result = await client.callTool({ name: "list_settings", arguments: {} });
+    const data = parseResult(result) as Array<{ key: string; masked_value: string }>;
+    expect(data).toHaveLength(1);
+    expect(data[0]!.key).toBe("ipinfo_token");
+    expect(data[0]!.masked_value).toBe("tok_*******");
+  });
+
+  test("delete_setting removes setting", async () => {
+    await client.callTool({
+      name: "set_setting",
+      arguments: { key: "ipinfo_token", value: "tok_test123" },
+    });
+    await client.callTool({
+      name: "delete_setting",
+      arguments: { key: "ipinfo_token" },
+    });
+
+    const result = await client.callTool({ name: "list_settings", arguments: {} });
+    const data = parseResult(result) as Array<unknown>;
+    expect(data).toHaveLength(0);
+  });
+});

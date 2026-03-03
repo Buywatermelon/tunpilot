@@ -4,6 +4,7 @@ import { register as registerNodes } from "./tools/nodes";
 import { register as registerUsers } from "./tools/users";
 import { register as registerSubscriptions } from "./tools/subscriptions";
 import { register as registerMonitoring } from "./tools/monitoring";
+import { register as registerSettings } from "./tools/settings";
 
 // 创建 MCP 服务器并注册所有工具组（共 17 个工具）
 export function createMcpServer(db: Db, baseUrl: string): McpServer {
@@ -16,6 +17,7 @@ export function createMcpServer(db: Db, baseUrl: string): McpServer {
   registerUsers(server, db, baseUrl);
   registerSubscriptions(server, db, baseUrl);
   registerMonitoring(server, db, baseUrl);
+  registerSettings(server, db, baseUrl);
 
   return server;
 }
