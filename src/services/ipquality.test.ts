@@ -74,4 +74,21 @@ describe("runIPQuality", () => {
     mockSpawn("{invalid json}}}");
     await expect(runIPQuality("1.2.3.4", "root")).rejects.toThrow("Failed to parse IPQuality JSON");
   });
+
+  test("does not override StrictHostKeyChecking", async () => {
+    let capturedArgs: string[] = [];
+    Bun.spawn = ((args: string[]) => {
+      capturedArgs = args;
+      return {
+        stdout: new Response(JSON.stringify(sampleOutput)).body!,
+        stderr: new Response("").body!,
+        exited: Promise.resolve(0),
+        kill: () => {},
+      };
+    }) as unknown as typeof Bun.spawn;
+
+    await runIPQuality("1.2.3.4", "root", 22);
+    expect(capturedArgs.join(" ")).not.toContain("StrictHostKeyChecking");
+    expect(capturedArgs.join(" ")).toContain("ConnectTimeout");
+  });
 });

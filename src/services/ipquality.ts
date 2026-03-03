@@ -34,7 +34,7 @@ export async function runIPQuality(
   sshPort: number = 22,
 ): Promise<IPQualityResult> {
   const proc = Bun.spawn(
-    ["ssh", "-p", String(sshPort), "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=10", `${sshUser}@${host}`, "bash <(curl -sL IP.Check.Place) -j -4"],
+    ["ssh", "-p", String(sshPort), "-o", "ConnectTimeout=10", `${sshUser}@${host}`, "bash <(curl -sL IP.Check.Place) -j -4"],
     { stdout: "pipe", stderr: "pipe" },
   );
 
