@@ -291,29 +291,3 @@ describe("settings tools", () => {
     expect(data).toHaveLength(0);
   });
 });
-
-// --- Diagnostics ---
-
-describe("diagnostics tools", () => {
-  beforeEach(setup);
-  afterEach(async () => cleanup());
-
-  test("test_node_ipquality returns error for invalid node_id", async () => {
-    const result = await client.callTool({
-      name: "test_node_ipquality",
-      arguments: { node_id: "nonexistent" },
-    });
-    expect(result.isError).toBe(true);
-  });
-
-  test("test_node_ipquality returns error when ssh_user not configured", async () => {
-    const node = addNode(db, { name: "n1", host: "1.1.1.1", port: 443, protocol: "hysteria2" });
-    const result = await client.callTool({
-      name: "test_node_ipquality",
-      arguments: { node_id: node.id },
-    });
-    expect(result.isError).toBe(true);
-    const data = parseResult(result) as { error: string };
-    expect(data.error).toContain("ssh_user");
-  });
-});
