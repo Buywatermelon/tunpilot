@@ -9,9 +9,9 @@ metadata:
 
 # TunPilot Node Diagnostics
 
-Run comprehensive diagnostics on proxy nodes: IP info, IP quality/purity, connectivity, and route testing. Generates a structured report with actionable recommendations.
+Run comprehensive IP quality check on proxy nodes via SSH using [IPQuality](https://github.com/xykt/IPQuality). Queries 10 IP risk databases, checks streaming media unlock, and email blacklists — zero API keys required.
 
-**Prerequisite**: TunPilot MCP must be connected. API keys should be configured via `set_setting` tool (use `list_settings` to check which are configured).
+**Prerequisite**: Node must have `ssh_user` configured (and SSH key access from the TunPilot server).
 
 ---
 
@@ -21,59 +21,63 @@ Ask the user which node(s) to test. Use `list_nodes` to show available nodes if 
 
 Accept:
 - A single node name or ID
-- "all" to test all enabled nodes
+- "all" to test all enabled nodes that have `ssh_user` configured
 
 ---
 
-## Phase 2: Run Diagnostics (Parallel)
+## Phase 2: Run Diagnostics
 
-For each target node, call these MCP tools **in parallel**:
+For each target node, call `test_node_ipquality(node_id)`.
 
-1. `check_node_ip` — IP geolocation, ASN, ISP
-2. `check_ip_quality` — Scamalytics + IPQS + AbuseIPDB fraud/purity scores
-3. `test_node_connectivity` — TCP handshake latency
-4. `test_node_route` with `from: "Beijing, CN"` — China route quality
-5. `test_node_route` with `from: "Tokyo, JP"` — Japan route quality (optional second location)
+This runs the IPQuality script on the node via SSH (~60-120s). It returns structured JSON with sections: Info, Type, Score, Factor, Media, Mail.
+
+If testing multiple nodes, run them in parallel.
 
 ---
 
-## Phase 3: Generate Report
+## Phase 3: Present Report
 
-Present results as a structured report per node:
+For each node, present results as a structured report:
 
 ### Node: {name} ({host})
 
 #### IP Information
 | Item | Value |
 |------|-------|
-| Location | {city}, {country} |
-| ASN | {asn} |
-| ISP | {isp} |
-| Hosting/DC | {yes/no} |
+| Location | {City.Name}, {Region.Name} |
+| ASN | AS{ASN} — {Organization} |
+| Type | {Type.Usage values} |
+| Timezone | {TimeZone} |
 
-#### IP Quality
-| Check | Result | Rating |
-|-------|--------|--------|
-| Scamalytics score | {score}/100 | {emoji} {risk_level} |
-| IPQS fraud score | {score}/100 | {emoji} |
-| AbuseIPDB reports | {count} reports | {emoji} |
-| VPN/Proxy detected | {yes/no} | {emoji} |
+#### Risk Scores
+| Provider | Score | Rating |
+|----------|-------|--------|
+| SCAMALYTICS | {score} | {low/medium/high} |
+| AbuseIPDB | {score} | {low/medium/high} |
+| IP2LOCATION | {score} | {low/medium/high} |
+| IPQS | {score} | {low/medium/high} |
 
-Rating scale: score 0-30 = low risk, 31-60 = medium risk, 61-100 = high risk.
+#### Risk Factors (across 9 providers)
+| Factor | Flagged By |
+|--------|-----------|
+| Proxy | {list providers where true, or "None"} |
+| VPN | {list providers where true, or "None"} |
+| Tor | {list providers where true, or "None"} |
+| Server/DC | {list providers where true, or "None"} |
+| Abuser | {list providers where true, or "None"} |
 
-#### Connectivity
-| Check | Result |
-|-------|--------|
-| TCP handshake | {latency}ms |
-| Port reachable | {yes/no} |
+#### Streaming Media Unlock
+| Service | Status | Region |
+|---------|--------|--------|
+| Netflix | {Yes/No/Block} | {region} |
+| Disney+ | {Yes/No/Block} | {region} |
+| ChatGPT | {Yes/No/Block} | {region} |
+| YouTube | {Yes/No/Block} | {region} |
+| ... | ... | ... |
 
-#### Route Quality
-| From | Latency | Packet Loss |
-|------|---------|-------------|
-| Beijing, CN | {avg}ms | {loss}% |
-| Tokyo, JP | {avg}ms | {loss}% |
-
-Items marked "未配置" indicate the corresponding API key is not set. Use `set_setting` to configure.
+#### Email & Blacklists
+- Port 25: {open/closed}
+- DNS Blacklist: {Clean}/{Total} clean ({Blacklisted} blacklisted)
 
 ---
 
@@ -81,36 +85,9 @@ Items marked "未配置" indicate the corresponding API key is not set. Use `set
 
 Based on the results, provide actionable recommendations:
 
-- **High fraud score (>60)**: "IP may be flagged by services. Consider rotating IP or switching provider."
-- **VPN/Proxy detected**: "IP is known as a proxy endpoint. Streaming services may block it."
-- **High abuse reports (>10)**: "IP has abuse history. Monitor for potential blacklisting."
-- **High latency from China (>300ms)**: "Route quality is poor. Consider a node with CN2/GIA routing."
-- **Packet loss >2%**: "Network path is unstable. Check provider's network quality."
-- **TCP unreachable**: "Port is not responding. Check firewall rules and service status."
-
----
-
-## Quick Reference: API Key Setup
-
-| Setting Key | Service | Get Key At |
-|-------------|---------|------------|
-| ipinfo_token | IPinfo.io | https://ipinfo.io/signup |
-| scamalytics_key | Scamalytics | https://scamalytics.com/ip/api |
-| ipqs_key | IPQualityScore | https://www.ipqualityscore.com/create-account |
-| globalping_token | Globalping | https://globalping.io/auth |
-| abuseipdb_key | AbuseIPDB | https://www.abuseipdb.com/register |
-
-Example: `set_setting(key: "ipinfo_token", value: "your_token_here")`
-
----
-
-## MCP Tools Reference
-
-| Tool | Purpose |
-|------|---------|
-| `list_settings` | Check which API keys are configured |
-| `set_setting` | Configure an API key |
-| `check_node_ip` | IP geolocation + ASN (uses ipinfo) |
-| `check_ip_quality` | IP purity scores (uses scamalytics + ipqs + abuseipdb) |
-| `test_node_connectivity` | TCP handshake latency test |
-| `test_node_route` | Route quality from specified location (uses globalping) |
+- **High risk scores**: "IP has elevated risk scores. Services may flag or block this IP."
+- **VPN/Proxy/Tor detected**: "IP is identified as proxy/VPN by {N} providers. Streaming services will likely block it."
+- **Server/DC type**: "IP is classified as datacenter. Some services restrict DC IPs."
+- **Media blocked**: "The following services are blocked: {list}. Consider a residential IP for streaming."
+- **DNS blacklisted**: "IP appears on {N} DNS blacklists. Email delivery will be affected."
+- **All clean**: "IP quality is excellent — low risk, no flags."

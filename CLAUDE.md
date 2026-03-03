@@ -21,13 +21,13 @@ src/
 ├── http/index.ts         # HTTP routes: /auth/:nodeId/:authSecret, /sub/:token, /health
 ├── mcp/
 │   ├── index.ts          # MCP server factory
-│   └── tools/            # 24 MCP tools in 6 groups
+│   └── tools/            # 21 MCP tools in 6 groups
 │       ├── nodes.ts      # Node CRUD (4 tools)
 │       ├── users.ts      # User CRUD (7 tools)
 │       ├── subscriptions.ts  # Subscription management (4 tools)
 │       ├── monitoring.ts # Health check & traffic stats (2 tools)
 │       ├── settings.ts   # Settings management (3 tools)
-│       └── diagnostics.ts # Node diagnostics (4 tools)
+│       └── diagnostics.ts # Node diagnostics (1 tool: test_node_ipquality)
 └── services/             # Business logic layer
     ├── auth.ts           # 4-step Hysteria2 auth callback
     ├── node.ts           # Node CRUD
@@ -35,15 +35,7 @@ src/
     ├── subscription.ts   # Subscription lifecycle
     ├── settings.ts       # Settings CRUD (API key storage)
     ├── traffic.ts        # Traffic sync from nodes + stats query
-    ├── diagnostics/      # Diagnostics Provider Registry (mirrors Format Registry)
-    │   ├── index.ts      # Registry: registerProvider() / runProvider() / runProvidersByCategory()
-    │   └── providers/    # Diagnostic providers (self-registering on import)
-    │       ├── connectivity.ts  # TCP handshake test
-    │       ├── ipinfo.ts        # IP geolocation + ASN (IPinfo.io)
-    │       ├── scamalytics.ts   # IP fraud score (Scamalytics)
-    │       ├── ipqs.ts          # IP quality score (IPQS)
-    │       ├── abuseipdb.ts     # IP abuse reports (AbuseIPDB)
-    │       └── globalping.ts    # Route latency test (Globalping)
+    ├── ipquality.ts      # IPQuality SSH runner (xykt/IPQuality script)
     └── formats/          # Subscription format renderers (Format Registry pattern)
         ├── index.ts      # Registry: registerFormat() / getFormat()
         ├── shadowrocket.ts
@@ -83,7 +75,7 @@ Bun auto-loads `.env` — no dotenv needed.
 
 - **Auth flow**: Hysteria2 node → POST `/auth/:nodeId/:authSecret` → validate node → lookup user by password → check status/quota/expiry → check node permission
 - **Subscription formats**: implement `SubscriptionFormat` interface, call `registerFormat()` — auto-discovered on import
-- **Diagnostics providers**: implement `DiagnosticProvider` interface, call `registerProvider()` — auto-discovered on import. API keys stored in `settings` table
+- **Diagnostics**: single `test_node_ipquality` tool runs [xykt/IPQuality](https://github.com/xykt/IPQuality) script on node via SSH — queries 10 IP risk databases with zero API keys
 - **MCP sessions**: per-client `McpServer` instances with 30-min TTL auto-cleanup
 - **Traffic sync**: periodic fetch from nodes' stats API → atomic transaction (insert logs + update used_bytes)
 - **Cascading deletes**: all FK relationships use ON DELETE CASCADE
