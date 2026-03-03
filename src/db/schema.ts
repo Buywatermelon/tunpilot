@@ -68,6 +68,15 @@ export const trafficLogs = sqliteTable("traffic_logs", {
   index("idx_traffic_logs_user_node").on(table.user_id, table.node_id),
 ]);
 
+// 系统设置表（API Key 等）
+export const settings = sqliteTable("settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updated_at: text("updated_at").default(sql`(datetime('now'))`),
+});
+
+export type Setting = typeof settings.$inferSelect;
+
 // 从 schema 推导的类型
 export type Node = typeof nodes.$inferSelect;
 export type NewNode = typeof nodes.$inferInsert;

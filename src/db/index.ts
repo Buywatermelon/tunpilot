@@ -80,6 +80,14 @@ export function initDatabase(path: string): Db {
     )
   `);
 
+  sqlite.run(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key         TEXT PRIMARY KEY,
+      value       TEXT NOT NULL,
+      updated_at  TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
   // 索引
   sqlite.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_password ON users(password)`);
   sqlite.run(`CREATE INDEX IF NOT EXISTS idx_traffic_logs_recorded_at ON traffic_logs(recorded_at)`);
