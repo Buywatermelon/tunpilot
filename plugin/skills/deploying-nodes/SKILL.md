@@ -135,13 +135,13 @@ ssh <server> "hysteria version"
 
 ### 2.3 Install Diagnostic Dependencies
 
-Install tools required by the IPQuality diagnostic script:
+Install tools required by the diagnostic scripts (IPQuality + NetQuality):
 
 ```bash
-ssh <server> "apt-get update -qq && apt-get install -y -qq jq curl bc netcat-openbsd dnsutils iproute2"
+ssh <server> "apt-get update -qq && apt-get install -y -qq jq curl bc netcat-openbsd dnsutils iproute2 iperf3 mtr"
 ```
 
-These are needed for the `test_node_ipquality` diagnostic tool to work without prompting for interactive installation.
+These are needed for `test_node_ipquality` and `test_node_netquality` diagnostic tools to work without prompting for interactive installation. NetQuality's remaining dependencies (`speedtest`, `nexttrace`) are auto-installed by the script's `-y` flag on first run.
 
 ### 2.4 TLS Certificate
 
@@ -362,3 +362,4 @@ Present a final report to the user:
 | `assign_nodes` | Grant a user access to specific nodes |
 | `generate_subscription` | Generate client subscription link for a user |
 | `test_node_ipquality` | Run IP quality diagnostic on a node |
+| `test_node_netquality` | Run network quality diagnostic on a node (latency, speed, BGP, routing) |
