@@ -4,7 +4,7 @@ import { nodes, type Node, type NewNode } from "../db/schema";
 
 // 添加节点参数
 export type AddNodeParams = Pick<NewNode, "name" | "host" | "port" | "protocol"> &
-  Partial<Pick<NewNode, "stats_port" | "stats_secret" | "sni" | "cert_path" | "cert_expires" | "hy2_version" | "config_path" | "ssh_user" | "ssh_port" | "insecure" | "enabled">>;
+  Partial<Pick<NewNode, "stats_port" | "stats_secret" | "sni" | "cert_path" | "cert_expires" | "hy2_version" | "config_path" | "ssh_user" | "ssh_port" | "ssh_alias" | "insecure" | "enabled">>;
 
 // 更新节点参数（排除不可修改字段）
 export type UpdateNodeParams = Partial<Omit<Node, "id" | "auth_secret" | "created_at">>;
