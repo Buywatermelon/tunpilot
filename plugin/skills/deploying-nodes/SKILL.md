@@ -143,6 +143,19 @@ ssh <server> "apt-get update -qq && apt-get install -y -qq jq curl bc netcat-ope
 
 These are needed for the `testing-nodes` skill diagnostics (IPQuality + NetQuality) to work without prompting for interactive installation. NetQuality's remaining dependencies (`speedtest`, `nexttrace`) are auto-installed by the script's `-y` flag on first run.
 
+### 2.3.1 Install Diagnostics Wrapper
+
+Deploy the `tunpilot-diag` script for clean JSON diagnostics output:
+
+```bash
+ssh <server> bash <<'DIAG_INSTALL'
+curl -fsSL https://raw.githubusercontent.com/Buywatermelon/tunpilot/main/scripts/tunpilot-diag.sh \
+  -o /usr/local/bin/tunpilot-diag
+chmod +x /usr/local/bin/tunpilot-diag
+tunpilot-diag --version
+DIAG_INSTALL
+```
+
 ### 2.4 TLS Certificate
 
 **Option A — With domain (ACME handled by Hysteria2 config):**

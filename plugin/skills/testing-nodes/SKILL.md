@@ -16,6 +16,7 @@ Run dual-dimension diagnostics on proxy nodes via direct SSH from the local mach
 
 **Prerequisites:**
 - Node must have `ssh_user` configured (and SSH key access from the local machine)
+- `tunpilot-diag` wrapper installed on the node (auto-installed in Phase 2.0 if missing)
 - IPQuality dependencies: `jq curl bc netcat-openbsd dnsutils iproute2`
 - NetQuality dependencies: `iperf3 mtr` (plus `speedtest`, `nexttrace` auto-installed by the script with `-y` flag)
 
@@ -35,31 +36,80 @@ Accept:
 
 For each target node, get `ssh_user`, `host`, and `ssh_port` from the `list_nodes` result.
 
-### 2.1 IPQuality (~60-120s)
+### 2.0 Pre-flight Check
+
+Verify `tunpilot-diag` is installed on each target node:
 
 ```bash
-ssh -p <ssh_port> <ssh_user>@<host> "bash <(curl -sL IP.Check.Place) -j -4"
+ssh -p <ssh_port> <ssh_user>@<host> "tunpilot-diag --version"
 ```
 
-The output contains progress text followed by a JSON object. Extract the JSON (everything from the first `{` to the end) for report rendering.
-
-### 2.2 NetQuality
-
-Available modes:
-- **full** (default, 3-5 min): `bash <(curl -sL Net.Check.Place) -j -4 -y`
-- **ping** (~30s): `bash <(curl -sL Net.Check.Place) -j -4 -y -P`
-- **low** (~2 min): `bash <(curl -sL Net.Check.Place) -j -4 -y -L`
+If the command fails (not found), install it:
 
 ```bash
-ssh -p <ssh_port> <ssh_user>@<host> "bash <(curl -sL Net.Check.Place) -j -4 -y"
+ssh -p <ssh_port> <ssh_user>@<host> bash <<'INSTALL'
+curl -fsSL https://raw.githubusercontent.com/Buywatermelon/tunpilot/main/scripts/tunpilot-diag.sh \
+  -o /usr/local/bin/tunpilot-diag
+chmod +x /usr/local/bin/tunpilot-diag
+tunpilot-diag --version
+INSTALL
 ```
 
-Same JSON extraction as IPQuality.
+Also ensure diagnostic dependencies are installed:
 
-### Parallelization
+```bash
+ssh -p <ssh_port> <ssh_user>@<host> "apt-get update -qq && apt-get install -y -qq jq curl bc netcat-openbsd dnsutils iproute2 iperf3 mtr"
+```
 
-- **Different nodes**: run in parallel (separate SSH sessions to different hosts)
-- **Same node**: run sequentially (IPQuality first, then NetQuality) — network tests would interfere with each other
+### 2.1 Execute Diagnostics (~5-7 min)
+
+Run the full diagnostics suite (IPQuality + NetQuality):
+
+```bash
+ssh -p <ssh_port> <ssh_user>@<host> "tunpilot-diag"
+```
+
+Output is two JSON lines on stdout:
+- Line 1: `{"type":"ipquality","data":{...}}` — use the `data` field for report rendering
+- Line 2: `{"type":"netquality","data":{...}}` — use the `data` field for report rendering
+
+If a check fails, the line will contain `"error"` instead of `"data"`.
+
+### Execution Strategy
+
+**Single node**: Use `run_in_background` so the agent is not blocked while diagnostics run. Tell the user diagnostics are running (~5-7 min). The agent will be automatically notified when the command completes.
+
+**Multiple nodes**: Launch each node's diagnostics in parallel using separate `run_in_background` Bash calls. Each node runs independently via separate SSH sessions.
+
+### Fallback (if tunpilot-diag cannot be installed)
+
+If the wrapper cannot be installed (e.g., permission issues, no curl), fall back to raw script execution with output filtering:
+
+```bash
+ssh -p <ssh_port> <ssh_user>@<host> "export TERM=dumb; bash <(curl -sL IP.Check.Place) -j -4" 2>&1 \
+  | sed 's/\x1b\[[0-9;]*m//g' > /tmp/ipquality-<node>.txt
+```
+
+Then extract JSON from the raw output using Python:
+
+```python
+python3 -c "
+import json, sys
+content = open('/tmp/ipquality-<node>.txt').read()
+depth, start = 0, -1
+for i, c in enumerate(content):
+    if c == '{' and start == -1: start, depth = i, 1
+    elif start >= 0:
+        depth += (c == '{') - (c == '}')
+        if depth == 0:
+            data = json.loads(content[start:i+1])
+            if 'Head' in data or 'Info' in data:
+                print(json.dumps(data)); break
+            start = -1
+"
+```
+
+Repeat for NetQuality with `Net.Check.Place` and `-j -4 -y` flags.
 
 ---
 
