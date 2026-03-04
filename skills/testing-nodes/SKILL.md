@@ -15,7 +15,7 @@ metadata:
 Run dual-dimension diagnostics on proxy nodes via direct SSH from the local machine: [IPQuality](https://github.com/xykt/IPQuality) for IP reputation (risk scores, streaming unlock, blacklists) and [NetQuality](https://github.com/xykt/NetQuality) for network performance (BGP, latency, speed, routing). Both tools require zero API keys.
 
 **Prerequisites:**
-- Node must have `ssh_user` configured (and SSH key access from the local machine)
+- Node must have `ssh_user` or `ssh_alias` configured (and SSH key access from the local machine)
 - `tunpilot-diag` wrapper installed on the node (auto-installed in Phase 2.0 if missing)
 - IPQuality dependencies: `jq curl bc netcat-openbsd dnsutils iproute2`
 - NetQuality dependencies: `iperf3 mtr` (plus `speedtest`, `nexttrace` auto-installed by the script with `-y` flag)
@@ -28,26 +28,32 @@ Ask the user which node(s) to test. Use `list_nodes` to show available nodes if 
 
 Accept:
 - A single node name or ID
-- "all" to test all enabled nodes that have `ssh_user` configured
+- "all" to test all enabled nodes that have `ssh_user` or `ssh_alias` configured
 
 ---
 
 ## Phase 2: Run Diagnostics
 
-For each target node, get `ssh_user`, `host`, and `ssh_port` from the `list_nodes` result.
+For each target node, get `ssh_alias`, `ssh_user`, `host`, and `ssh_port` from the `list_nodes` result.
+
+**Resolve SSH target** (use throughout this phase):
+- If `ssh_alias` is set → use `ssh <ssh_alias>` (e.g., `ssh bwg`)
+- Otherwise → use `ssh -p <ssh_port> <ssh_user>@<host>`
+
+All SSH commands below use `<ssh_target>` as shorthand for the resolved target.
 
 ### 2.0 Pre-flight Check
 
 Verify `tunpilot-diag` is installed on each target node:
 
 ```bash
-ssh -p <ssh_port> <ssh_user>@<host> "tunpilot-diag --version"
+ssh <ssh_target> "tunpilot-diag --version"
 ```
 
 If the command fails (not found), install it:
 
 ```bash
-ssh -p <ssh_port> <ssh_user>@<host> bash <<'INSTALL'
+ssh <ssh_target> bash <<'INSTALL'
 curl -fsSL https://raw.githubusercontent.com/Buywatermelon/tunpilot/main/scripts/tunpilot-diag.sh \
   -o /usr/local/bin/tunpilot-diag
 chmod +x /usr/local/bin/tunpilot-diag
@@ -58,15 +64,20 @@ INSTALL
 Also ensure diagnostic dependencies are installed:
 
 ```bash
-ssh -p <ssh_port> <ssh_user>@<host> "apt-get update -qq && apt-get install -y -qq jq curl bc netcat-openbsd dnsutils iproute2 iperf3 mtr"
+ssh <ssh_target> "apt-get update -qq && apt-get install -y -qq jq curl bc netcat-openbsd dnsutils iproute2 iperf3 mtr"
 ```
 
-### 2.1 Execute Diagnostics (~5-7 min)
+### 2.1 Execute Diagnostics
+
+`tunpilot-diag` supports subcommands:
+- `tunpilot-diag all` — full suite: IPQuality + NetQuality (~5-7 min) **(default)**
+- `tunpilot-diag ip` — IP reputation only (~2-3 min)
+- `tunpilot-diag net` — network performance only (~3-5 min)
 
 Run the full diagnostics suite (IPQuality + NetQuality):
 
 ```bash
-ssh -p <ssh_port> <ssh_user>@<host> "tunpilot-diag"
+ssh <ssh_target> "tunpilot-diag"
 ```
 
 Output is two JSON lines on stdout:
@@ -86,7 +97,7 @@ If a check fails, the line will contain `"error"` instead of `"data"`.
 If the wrapper cannot be installed (e.g., permission issues, no curl), fall back to raw script execution with output filtering:
 
 ```bash
-ssh -p <ssh_port> <ssh_user>@<host> "export TERM=dumb; bash <(curl -sL IP.Check.Place) -j -4" 2>&1 \
+ssh <ssh_target> "export TERM=dumb; bash <(curl -sL IP.Check.Place) -j -4" 2>&1 \
   | sed 's/\x1b\[[0-9;]*m//g' > /tmp/ipquality-<node>.txt
 ```
 
@@ -474,15 +485,15 @@ When comparing multiple nodes, explicitly state:
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `SSH command failed (exit 255)` | SSH connection refused or auth failed | Verify `ssh_user` is correct, SSH key is set up, and the node is reachable. Test manually: `ssh <user>@<host> "echo ok"` |
-| `SSH command failed (exit 1)` with empty output | SSH connected but command failed | Check if bash is available on the node. Try: `ssh <user>@<host> "which bash"` |
-| "Invalid input, script exited" | IPQuality script dependencies missing | Install deps: `ssh <server> "apt-get update -qq && apt-get install -y -qq jq curl bc netcat-openbsd dnsutils iproute2"` |
-| "No JSON found in output" | Script ran but produced no JSON | Script may have failed silently. Run manually: `ssh <user>@<host> "bash <(curl -sL IP.Check.Place) -j -4"` and check output |
-| IPQuality times out (>120s) | Slow network or DNS issues on node | Check node's internet connectivity: `ssh <user>@<host> "curl -sL ifconfig.me"`. DNS blacklist check is usually the slowest part |
+| `SSH command failed (exit 255)` | SSH connection refused or auth failed | Verify `ssh_alias` or `ssh_user` is correct, SSH key is set up, and the node is reachable. Test manually: `ssh <ssh_target> "echo ok"` |
+| `SSH command failed (exit 1)` with empty output | SSH connected but command failed | Check if bash is available on the node. Try: `ssh <ssh_target> "which bash"` |
+| "Invalid input, script exited" | IPQuality script dependencies missing | Install deps: `ssh <ssh_target> "apt-get update -qq && apt-get install -y -qq jq curl bc netcat-openbsd dnsutils iproute2"` |
+| "No JSON found in output" | Script ran but produced no JSON | Script may have failed silently. Run manually: `ssh <ssh_target> "bash <(curl -sL IP.Check.Place) -j -4"` and check output |
+| IPQuality times out (>120s) | Slow network or DNS issues on node | Check node's internet connectivity: `ssh <ssh_target> "curl -sL ifconfig.me"`. DNS blacklist check is usually the slowest part |
 | `IPQS: null` in scores | IPQS API unreachable from node | Not a problem — just means IPQS couldn't be queried. Other 5 score providers still give useful data |
 | NetQuality timeout (>10 min) | Full mode too slow for this server | Use `ping` mode for quick latency check, or `low` mode to skip speedtest |
-| iperf3 errors in NetQuality | `iperf3` not installed on the node | Install: `ssh <server> "apt-get update -qq && apt-get install -y -qq iperf3 mtr"` |
-| "speedtest not found" in NetQuality | speedtest CLI missing | Will be auto-installed on next run (the `-y` flag enables auto-install). If it persists, install manually: `ssh <server> "curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | bash && apt-get install -y speedtest"` |
+| iperf3 errors in NetQuality | `iperf3` not installed on the node | Install: `ssh <ssh_target> "apt-get update -qq && apt-get install -y -qq iperf3 mtr"` |
+| "speedtest not found" in NetQuality | speedtest CLI missing | Will be auto-installed on next run (the `-y` flag enables auto-install). If it persists, install manually: `ssh <ssh_target> "curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | bash && apt-get install -y speedtest"` |
 
 ---
 
@@ -490,5 +501,5 @@ When comparing multiple nodes, explicitly state:
 
 | Tool | Use When |
 |------|----------|
-| `list_nodes` | See all registered nodes and their ssh_user config |
+| `list_nodes` | See all registered nodes and their ssh_alias/ssh_user config |
 | `check_health` | Quick health check before running diagnostics |
