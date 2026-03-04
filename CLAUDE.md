@@ -84,3 +84,4 @@ Bun auto-loads `.env` — no dotenv needed.
 - Don't use: express, better-sqlite3, dotenv, node:fs readFile/writeFile
 - Tests use `bun:test` with in-memory SQLite (`initDatabase(":memory:")`)
 - All database tables use UUID primary keys (except `trafficLogs` which uses auto-increment)
+- **Skills**: `skills/` is the single source of truth. Do NOT manually copy to `plugin/skills/` or `openclaw/skills/` — CI auto-syncs on push to main (`.github/workflows/sync-plugin-skills.yml`)

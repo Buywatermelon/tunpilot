@@ -1,4 +1,4 @@
-> 项目开源地址：[GitHub - TunPilot](https://github.com/Buywatermelon/tunpilot) (欢迎 Star ✨)
+https://github.com/Buywatermelon/tunpilot
 
 # 为什么做这个项目
 
