@@ -86,3 +86,4 @@ Bun auto-loads `.env` — no dotenv needed.
 - Tests use `bun:test` with in-memory SQLite (`initDatabase(":memory:")`)
 - All database tables use UUID primary keys (except `trafficLogs` which uses auto-increment)
 - **Skills**: `skills/` is the single source of truth. Do NOT manually copy to `plugin/skills/` or `openclaw/skills/` — CI auto-syncs on push to main (`.github/workflows/sync-plugin-skills.yml`)
+- **Plugin version**: Bump `plugin/.claude-plugin/plugin.json` version when adding/removing skills — the marketplace caches by version number, so unchanged version = no update for users
