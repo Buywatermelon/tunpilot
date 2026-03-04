@@ -40,10 +40,11 @@ src/
         ├── singbox.ts
         ├── clash.ts
         └── surge.ts
-plugin/                   # Claude Code plugin (skills + MCP connection)
+plugin/                   # Claude Code plugin (skills auto-synced by CI)
 openclaw/                 # OpenClaw plugin (skills + gateway auto-registration)
-skills/                   # Shared skill definitions (synced to plugin dirs)
+skills/                   # Shared skill definitions (source of truth, CI syncs to plugin/)
 scripts/deploy.sh         # One-click deployment to systemd
+scripts/tunpilot-diag.sh  # Node diagnostics wrapper (deployed to /usr/local/bin/tunpilot-diag)
 ```
 
 ## Commands
