@@ -48,6 +48,7 @@ describe("addNode", () => {
       config_path: "/etc/hy2/config.yaml",
       ssh_user: "root",
       ssh_port: 2222,
+      ssh_alias: "bwg",
       enabled: 0,
     });
 
@@ -60,6 +61,7 @@ describe("addNode", () => {
     expect(node.config_path).toBe("/etc/hy2/config.yaml");
     expect(node.ssh_user).toBe("root");
     expect(node.ssh_port).toBe(2222);
+    expect(node.ssh_alias).toBe("bwg");
     expect(node.enabled).toBe(0);
   });
 });
