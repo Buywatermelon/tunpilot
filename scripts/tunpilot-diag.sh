@@ -45,25 +45,17 @@ run_script() {
 
   echo >&2 "tunpilot-diag: running $label..."
 
-  if ! TERM=dumb bash -c "$cmd" > "$tmpfile" 2>/dev/null; then
-    local ec=$?
-    # Script may exit non-zero but still produce JSON — try extraction
-    local result
-    result=$(extract_json < "$tmpfile")
-    if [[ -n "$result" ]]; then
-      echo "{\"type\":\"$label\",\"data\":$result}"
-      return 0
-    fi
-    echo "{\"type\":\"$label\",\"error\":\"script failed\",\"exit_code\":$ec}"
-    return 0
-  fi
+  local ec=0
+  TERM=dumb bash -c "$cmd" > "$tmpfile" 2>/dev/null || ec=$?
 
   local result
   result=$(extract_json < "$tmpfile")
   if [[ -n "$result" ]]; then
     echo "{\"type\":\"$label\",\"data\":$result}"
+  elif [[ $ec -ne 0 ]]; then
+    echo "{\"type\":\"$label\",\"error\":\"script failed\",\"exit_code\":$ec}"
   else
-    echo "{\"type\":\"$label\",\"error\":\"no JSON found in output\"}"
+    echo "{\"type\":\"$label\",\"error\":\"no JSON found in output\",\"exit_code\":0}"
   fi
 }
 
