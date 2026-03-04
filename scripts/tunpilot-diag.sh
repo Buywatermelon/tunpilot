@@ -3,7 +3,7 @@
 # Deployed to /usr/local/bin/tunpilot-diag on proxy nodes
 set -euo pipefail
 
-VERSION="1.0.0"
+VERSION="1.1.0"
 
 if [[ "${1:-}" == "--version" ]]; then
   echo "tunpilot-diag $VERSION"
@@ -60,9 +60,25 @@ run_script() {
 }
 
 # --- Main ---
-echo >&2 "tunpilot-diag v$VERSION — starting diagnostics"
+SUBCMD="${1:-all}"
 
-run_script "ipquality" "curl -sL IP.Check.Place | bash -s -- -j -4"
-run_script "netquality" "curl -sL Net.Check.Place | bash -s -- -j -4 -y"
+echo >&2 "tunpilot-diag v$VERSION — running: $SUBCMD"
+
+case "$SUBCMD" in
+  ip)
+    run_script "ipquality" "curl -sL IP.Check.Place | bash -s -- -j -4"
+    ;;
+  net)
+    run_script "netquality" "curl -sL Net.Check.Place | bash -s -- -j -4 -y"
+    ;;
+  all)
+    run_script "ipquality" "curl -sL IP.Check.Place | bash -s -- -j -4"
+    run_script "netquality" "curl -sL Net.Check.Place | bash -s -- -j -4 -y"
+    ;;
+  *)
+    echo >&2 "Usage: tunpilot-diag [--version|ip|net|all]"
+    exit 1
+    ;;
+esac
 
 echo >&2 "tunpilot-diag: done"
