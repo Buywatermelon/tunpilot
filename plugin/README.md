@@ -31,6 +31,7 @@
 |-------|---------|------|
 | `getting-started` | 部署 TunPilot 服务 / 连接 MCP / 首次配置 | 引导一键部署 + MCP 连接 |
 | `deploying-nodes` | 部署 Hysteria2 代理节点 | 提供配置模板和分步操作流程 |
+| `testing-nodes` | 质量检测 / 网络测速 / IP 风险扫描 | 直连服务器执行 IPQuality 和 NetQuality 诊断，输出节点健康报告 |
 
 ## MCP 连接后
 

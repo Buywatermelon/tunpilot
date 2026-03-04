@@ -41,6 +41,7 @@ clawhub install deploying-nodes
 | Skill | 说明 |
 |-------|------|
 | `deploying-nodes` | Hysteria2 节点部署指南，包含配置模板和分步操作流程 |
+| `testing-nodes` | 直连服务器执行 IPQuality 和 NetQuality 诊断，输出节点健康报告 |
 
 Skill 需要的环境依赖：
 - 环境变量：`TUNPILOT_URL`, `TUNPILOT_MCP_TOKEN`
