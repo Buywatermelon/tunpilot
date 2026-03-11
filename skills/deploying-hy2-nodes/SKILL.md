@@ -1,5 +1,5 @@
 ---
-name: deploying-nodes
+name: deploying-hy2-nodes
 description: Use when deploying a new Hysteria2 proxy node, configuring TLS certificates, registering nodes in TunPilot, or performing node operations.
 metadata:
   openclaw:

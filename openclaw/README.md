@@ -11,7 +11,7 @@ openclaw plugins install @tunpilot/openclaw-plugin
 也可以单独安装 Skill（不需要完整插件）：
 
 ```bash
-clawhub install deploying-nodes
+clawhub install deploying-hy2-nodes
 ```
 
 ## 配置
@@ -40,7 +40,8 @@ clawhub install deploying-nodes
 
 | Skill | 说明 |
 |-------|------|
-| `deploying-nodes` | Hysteria2 节点部署指南，包含配置模板和分步操作流程 |
+| `deploying-hy2-nodes` | Hysteria2 节点部署指南，包含配置模板和分步操作流程 |
+| `deploying-xray-nodes` | Xray/Trojan 节点部署指南，包含配置模板和分步操作流程 |
 | `testing-nodes` | 直连服务器执行 IPQuality 和 NetQuality 诊断，输出节点健康报告 |
 
 Skill 需要的环境依赖：

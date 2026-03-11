@@ -20,7 +20,8 @@
 
 ```
 > 帮我部署 TunPilot 并连接           ← getting-started skill（部署 + 连接一气呵成）
-> 部署一个新的 Hysteria2 节点         ← deploying-nodes skill
+> 部署一个新的 Hysteria2 节点         ← deploying-hy2-nodes skill
+> 部署一个新的 Xray/Trojan 节点       ← deploying-xray-nodes skill
 ```
 
 每一步都由对应的 Skill 引导 Agent 自动完成。
@@ -30,7 +31,8 @@
 | Skill | 触发场景 | 作用 |
 |-------|---------|------|
 | `getting-started` | 部署 TunPilot 服务 / 连接 MCP / 首次配置 | 引导一键部署 + MCP 连接 |
-| `deploying-nodes` | 部署 Hysteria2 代理节点 | 提供配置模板和分步操作流程 |
+| `deploying-hy2-nodes` | 部署 Hysteria2 代理节点 | 提供配置模板和分步操作流程 |
+| `deploying-xray-nodes` | 部署 Xray/Trojan 代理节点 | 提供配置模板和分步操作流程 |
 | `testing-nodes` | 质量检测 / 网络测速 / IP 风险扫描 | 直连服务器执行 IPQuality 和 NetQuality 诊断，输出节点健康报告 |
 
 ## MCP 连接后

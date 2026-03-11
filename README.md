@@ -1,6 +1,6 @@
 # TunPilot
 
-Agent-native 代理节点管理服务。通过 MCP (Model Context Protocol) 提供 Hysteria2 节点的全生命周期管理，专为 LLM Agent 设计，无传统 Web UI。
+Agent-native 代理节点管理服务。通过 MCP (Model Context Protocol) 提供 Hysteria2 / Xray(Trojan) 节点的全生命周期管理，专为 LLM Agent 设计，无传统 Web UI。
 
 ```
 用户 → LLM Agent (Claude Code / OpenClaw) → TunPilot MCP → Hysteria2 节点
@@ -8,7 +8,7 @@ Agent-native 代理节点管理服务。通过 MCP (Model Context Protocol) 提�
 
 ## 核心功能
 
-- **节点管理** — 注册、更新、启用/禁用 Hysteria2 代理节点
+- **节点管理** — 注册、更新、启用/禁用 Hysteria2 / Xray(Trojan) 代理节点
 - **用户管理** — 创建用户、分配节点权限、设置流量配额和有效期
 - **订阅生成** — 支持 Shadowrocket、Sing-box、Clash、Surge 四种格式
 - **流量监控** — 自动从节点同步流量数据，实时配额检查
@@ -74,7 +74,8 @@ Agent 会自动加载 `getting-started` skill，引导完成：
 | Skill | 触发场景 | 作用 |
 |-------|---------|------|
 | `getting-started` | 部署 TunPilot / 连接 MCP / 首次配置 | 一键部署服务器 + 自动连接 MCP |
-| `deploying-nodes` | 部署 Hysteria2 代理节点 | 提供配置模板和分步操作流程 |
+| `deploying-hy2-nodes` | 部署 Hysteria2 代理节点 | 提供配置模板和分步操作流程 |
+| `deploying-xray-nodes` | 部署 Xray/Trojan 代理节点 | 提供配置模板和分步操作流程 |
 | `testing-nodes` | 质量检测 / 网络测速 / IP 风险扫描 | 直连服务器执行 IPQuality 和 NetQuality 诊断，输出节点健康报告 |
 
 ## MCP Tools
@@ -224,9 +225,12 @@ bun run dev
 skills/
 ├── getting-started/              # 部署服务 + 连接 MCP
 │   └── SKILL.md
-└── deploying-nodes/              # 部署 Hysteria2 节点
+├── deploying-hy2-nodes/           # 部署 Hysteria2 节点
+│   ├── SKILL.md
+│   └── hysteria2-template.md
+└── deploying-xray-nodes/          # 部署 Xray/Trojan 节点
     ├── SKILL.md
-    └── hysteria2-template.md
+    └── xray-template.md
 ```
 
 ## License

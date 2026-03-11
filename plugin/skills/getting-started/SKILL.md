@@ -169,4 +169,4 @@ After connecting, the user has 20 MCP tools across 5 categories:
 - **Monitoring** (2): check_health, get_traffic_stats
 - **Settings** (3): set_setting, list_settings, delete_setting
 
-Next step: deploy Hysteria2 proxy nodes using the `deploying-nodes` skill.
+Next step: deploy proxy nodes using the `deploying-hy2-nodes` (Hysteria2) or `deploying-xray-nodes` (Trojan) skill.
