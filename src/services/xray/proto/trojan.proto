@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package xray.proxy.trojan;
+
+// Trojan account — serialized into TypedMessage.value when adding a Trojan user.
+
+message Account {
+  string password = 1;
+}

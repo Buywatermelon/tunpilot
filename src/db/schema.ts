@@ -19,6 +19,7 @@ export const nodes = sqliteTable("nodes", {
   ssh_user: text("ssh_user"),
   ssh_port: integer("ssh_port").default(22),
   ssh_alias: text("ssh_alias"),
+  cert_fingerprint: text("cert_fingerprint"),
   insecure: integer("insecure").default(0),
   enabled: integer("enabled").default(1),
   created_at: text("created_at").default(sql`(datetime('now'))`),

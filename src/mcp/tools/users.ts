@@ -5,12 +5,14 @@ import {
   createUser,
   listUsers,
   getUser,
-  updateUser,
-  deleteUser,
-  resetTraffic,
-  assignNodesToUser,
   getUserNodes,
 } from "../../services/user";
+import {
+  updateUserWithSync,
+  deleteUserWithSync,
+  resetTrafficWithSync,
+  assignNodesWithSync,
+} from "../../services/user-ops";
 
 // 注册用户管理工具（7 个）：list_users, create_user, update_user, delete_user, reset_traffic, assign_nodes, list_user_nodes
 export function register(server: McpServer, db: Db, _baseUrl: string) {
@@ -32,7 +34,7 @@ export function register(server: McpServer, db: Db, _baseUrl: string) {
       description: "Create a new user. IMPORTANT: Before calling this tool, you MUST confirm ALL optional parameters with the user. Present a summary table showing: username, password, quota (default: unlimited), max devices (default: 3), expiry (default: never), and which nodes to assign. Only proceed after explicit user confirmation.",
       inputSchema: {
         name: z.string().describe("Unique username"),
-        password: z.string().describe("Hysteria2 auth password"),
+        password: z.string().describe("Auth password (Hysteria2 / Trojan)"),
         quota_bytes: z.number().optional().describe("Traffic quota in bytes (0 = unlimited)"),
         expires_at: z.string().optional().describe("Expiry datetime (null = never)"),
         max_devices: z.number().optional().describe("Max concurrent devices (default: 3)"),
@@ -58,7 +60,7 @@ export function register(server: McpServer, db: Db, _baseUrl: string) {
       },
     },
     async ({ id, ...updates }) => {
-      const user = updateUser(db, id, updates);
+      const user = await updateUserWithSync(db, id, updates);
       if (!user) {
         return {
           isError: true,
@@ -76,7 +78,7 @@ export function register(server: McpServer, db: Db, _baseUrl: string) {
       inputSchema: { id: z.string().describe("User ID") },
     },
     async ({ id }) => {
-      deleteUser(db, id);
+      await deleteUserWithSync(db, id);
       return { content: [{ type: "text", text: JSON.stringify({ success: true }) }] };
     }
   );
@@ -88,7 +90,7 @@ export function register(server: McpServer, db: Db, _baseUrl: string) {
       inputSchema: { id: z.string().describe("User ID") },
     },
     async ({ id }) => {
-      resetTraffic(db, id);
+      await resetTrafficWithSync(db, id);
       return { content: [{ type: "text", text: JSON.stringify({ success: true }) }] };
     }
   );
@@ -110,7 +112,7 @@ export function register(server: McpServer, db: Db, _baseUrl: string) {
           content: [{ type: "text", text: JSON.stringify({ error: "User not found" }) }],
         };
       }
-      assignNodesToUser(db, user_id, node_ids);
+      await assignNodesWithSync(db, user_id, node_ids);
       const assigned = getUserNodes(db, user_id);
       return {
         content: [{ type: "text", text: JSON.stringify({ user_id, nodes: assigned.map(n => ({ id: n.id, name: n.name })) }) }],

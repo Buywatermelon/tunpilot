@@ -8,18 +8,21 @@ export const singbox: SubscriptionFormat = {
   render(user: User, nodes: Node[], _meta?: RenderMeta): string {
     const nodeNames = nodes.map((n) => n.name);
 
-    const hy2Outbounds = nodes.map((n) => ({
-      type: "hysteria2" as const,
-      tag: n.name,
-      server: n.host,
-      server_port: n.port,
-      password: user.password,
-      tls: {
+    const proxyOutbounds = nodes.map((n) => {
+      const tls: Record<string, unknown> = {
         enabled: true,
         server_name: n.sni || n.host,
-        ...(n.insecure ? { insecure: true } : {}),
-      },
-    }));
+      };
+      if (n.cert_fingerprint && n.protocol === "trojan") {
+        tls.certificate = [`sha256/${n.cert_fingerprint}`];
+      } else if (n.insecure) {
+        tls.insecure = true;
+      }
+      if (n.protocol === "trojan") {
+        return { type: "trojan" as const, tag: n.name, server: n.host, server_port: n.port, password: user.password, tls };
+      }
+      return { type: "hysteria2" as const, tag: n.name, server: n.host, server_port: n.port, password: user.password, tls };
+    });
 
     const config = {
       log: { level: "info" },
@@ -53,7 +56,7 @@ export const singbox: SubscriptionFormat = {
           outbounds: [...nodeNames],
           interval: "5m",
         },
-        ...hy2Outbounds,
+        ...proxyOutbounds,
         { type: "direct", tag: "direct" },
         { type: "block", tag: "block" },
         { type: "dns", tag: "dns-out" },

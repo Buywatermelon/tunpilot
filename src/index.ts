@@ -4,6 +4,8 @@ import { initDatabase } from "./db/index.ts";
 import { createHttpApp } from "./http/index.ts";
 import { createMcpServer } from "./mcp/index.ts";
 import { startTrafficSync, cleanupOldTrafficLogs } from "./services/traffic.ts";
+import { reconcileAllXrayNodes } from "./services/xray/sync.ts";
+import { closeAllXrayClients } from "./services/xray/pool.ts";
 import {
   StreamableHTTPTransport,
   bearerAuth,
@@ -89,6 +91,16 @@ const syncTimer = startTrafficSync(db, config.trafficSyncInterval);
 cleanupOldTrafficLogs(db);
 const retentionTimer = setInterval(() => cleanupOldTrafficLogs(db), 24 * 60 * 60 * 1000);
 
+// Xray/Trojan 节点：启动时全量对账 + 定期对账（10 分钟）
+reconcileAllXrayNodes(db).catch((err) => {
+  console.error("Initial Xray reconciliation failed:", err);
+});
+const xrayReconcileTimer = setInterval(() => {
+  reconcileAllXrayNodes(db).catch((err) => {
+    console.error("Xray reconciliation failed:", err);
+  });
+}, 600_000);
+
 // 启动服务器
 const server = Bun.serve({
   port: config.port,
@@ -107,6 +119,8 @@ function shutdown() {
   clearInterval(syncTimer);
   clearInterval(retentionTimer);
   clearInterval(sessionCleanup);
+  clearInterval(xrayReconcileTimer);
+  closeAllXrayClients();
   server.stop();
   db.$client.close();
   process.exit(0);

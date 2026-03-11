@@ -11,6 +11,8 @@
   "type": "module",
   "private": true,
   "dependencies": {
+    "@grpc/grpc-js": "^1.14.3",
+    "@grpc/proto-loader": "^0.8.0",
     "@hono/mcp": "^0",
     "@modelcontextprotocol/sdk": "^1",
     "drizzle-orm": "^0.45.1",

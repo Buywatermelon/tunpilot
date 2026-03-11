@@ -9,13 +9,18 @@ export const clash: SubscriptionFormat = {
     const proxies = nodes
       .map((n) => {
         const sni = n.sni || n.host;
+        const type = n.protocol === "trojan" ? "trojan" : "hysteria2";
         let entry = `  - name: "${n.name}"
-    type: hysteria2
+    type: ${type}
     server: ${n.host}
     port: ${n.port}
     password: "${user.password}"
     sni: ${sni}`;
-        if (n.insecure) entry += `\n    skip-cert-verify: true`;
+        if (n.cert_fingerprint && n.protocol === "trojan") {
+          entry += `\n    fingerprint: ${n.cert_fingerprint}`;
+        } else if (n.insecure) {
+          entry += `\n    skip-cert-verify: true`;
+        }
         return entry;
       })
       .join("\n\n");

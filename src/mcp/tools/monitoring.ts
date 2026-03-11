@@ -4,6 +4,7 @@ import type { Db } from "../../db/index";
 import { listNodes } from "../../services/node";
 import { eq, and, gte, lt, sql } from "drizzle-orm";
 import { trafficLogs } from "../../db/schema";
+import { getXrayClient } from "../../services/xray/pool";
 
 // 注册监控工具（2 个）：check_health, get_traffic_stats
 export function register(server: McpServer, db: Db, _baseUrl: string) {
@@ -28,16 +29,26 @@ export function register(server: McpServer, db: Db, _baseUrl: string) {
           if (!node.enabled) return { ...base, status: "disabled" as const };
 
           // 如果配置了 stats_port，实际 ping 节点
-          if (node.stats_port && node.stats_secret) {
+          if (node.stats_port) {
             try {
-              const res = await fetch(
-                `http://${node.host}:${node.stats_port}/traffic`,
-                {
-                  headers: { Authorization: node.stats_secret },
-                  signal: AbortSignal.timeout(5000),
+              if (node.protocol === "trojan") {
+                // Xray/Trojan: gRPC health check via QueryStats
+                const client = getXrayClient(node);
+                if (client) {
+                  await client.queryTraffic(false);
+                  return { ...base, status: "online" as const };
                 }
-              );
-              return { ...base, status: res.ok ? "online" as const : `error_${res.status}` };
+              } else if (node.stats_secret) {
+                // Hysteria2: HTTP stats API ping
+                const res = await fetch(
+                  `http://${node.host}:${node.stats_port}/traffic`,
+                  {
+                    headers: { Authorization: node.stats_secret },
+                    signal: AbortSignal.timeout(5000),
+                  }
+                );
+                return { ...base, status: res.ok ? "online" as const : `error_${res.status}` };
+              }
             } catch {
               return { ...base, status: "unreachable" as const };
             }

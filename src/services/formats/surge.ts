@@ -3,14 +3,17 @@ import type { SubscriptionFormat, RenderMeta } from "./index";
 
 function renderProxyLine(node: Node, password: string): string {
   const sni = node.sni || node.host;
+  const type = node.protocol === "trojan" ? "trojan" : "hysteria2";
   const parts = [
-    `${node.name} = hysteria2`,
+    `${node.name} = ${type}`,
     node.host,
     String(node.port),
     `password=${password}`,
     `sni=${sni}`,
   ];
-  if (node.insecure === 1) {
+  if (node.cert_fingerprint && node.protocol === "trojan") {
+    parts.push(`server-cert-fingerprint-sha256=${node.cert_fingerprint}`);
+  } else if (node.insecure === 1) {
     parts.push("skip-cert-verify=true");
   }
   return parts.join(", ");

@@ -1,6 +1,7 @@
 import { eq, and, gte, lt, sql, isNotNull } from "drizzle-orm";
 import type { Db } from "../db/index";
 import { nodes, users, trafficLogs, type Node } from "../db/schema";
+import { getXrayClient } from "./xray/pool";
 
 export interface SyncResult {
   nodeId: string;
@@ -23,11 +24,82 @@ export interface TrafficStat {
   recordedAt: string;
 }
 
-// 从单个节点同步流量数据
+// 从 Xray 节点同步流量数据（gRPC）
+async function syncTrafficFromXrayNode(db: Db, node: Node): Promise<SyncResult> {
+  const result: SyncResult = { nodeId: node.id, synced: 0, errors: [] };
+
+  const client = getXrayClient(node);
+  if (!client) {
+    result.errors.push(`No gRPC client for node ${node.name}`);
+    return result;
+  }
+
+  let data: Map<string, { tx: number; rx: number }>;
+  try {
+    data = await client.queryTraffic(true);
+  } catch (err: any) {
+    result.errors.push(`gRPC query failed for node ${node.name}: ${err.message}`);
+    return result;
+  }
+
+  if (data.size === 0) return result;
+
+  try {
+    db.$client.run("BEGIN");
+
+    for (const [username, traffic] of data) {
+      const totalBytes = traffic.tx + traffic.rx;
+      if (totalBytes === 0) continue;
+
+      const user = db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.name, username))
+        .get();
+
+      if (!user) {
+        result.errors.push(`Unknown user: ${username}`);
+        continue;
+      }
+
+      db.insert(trafficLogs)
+        .values({
+          user_id: user.id,
+          node_id: node.id,
+          tx_bytes: traffic.tx,
+          rx_bytes: traffic.rx,
+        })
+        .run();
+
+      db.update(users)
+        .set({ used_bytes: sql`used_bytes + ${totalBytes}` })
+        .where(eq(users.id, user.id))
+        .run();
+
+      result.synced++;
+    }
+
+    db.$client.run("COMMIT");
+  } catch (err: any) {
+    db.$client.run("ROLLBACK");
+    console.error(`Traffic sync DB write failed for Xray node ${node.name}, raw data:`, JSON.stringify([...data]));
+    result.errors.push(`DB write failed: ${err.message}`);
+  }
+
+  return result;
+}
+
+// 从单个节点同步流量数据（协议分发）
 export async function syncTrafficFromNode(
   db: Db,
   node: Node
 ): Promise<SyncResult> {
+  // Xray/Trojan 节点使用 gRPC 流量查询
+  if (node.protocol === "trojan") {
+    return syncTrafficFromXrayNode(db, node);
+  }
+
+  // Hysteria2 节点使用 HTTP stats API
   const result: SyncResult = { nodeId: node.id, synced: 0, errors: [] };
 
   let data: Record<string, { tx: number; rx: number }>;
