@@ -1,89 +1,29 @@
 # TunPilot
 
-Agent-native Hysteria2 proxy node management service. No web UI — designed for LLM Agents via MCP.
+Hysteria2 / Xray(Trojan) 代理节点管理服务，通过 MCP 供 LLM Agent 操作，无 Web UI。
 
-## Tech Stack
+## 技术栈
 
-- **Runtime**: Bun (not Node.js)
+- **运行时**: Bun（非 Node.js）
 - **HTTP**: Hono
-- **Database**: SQLite via Drizzle ORM (`bun:sqlite`)
-- **MCP**: `@modelcontextprotocol/sdk` + `@hono/mcp` (Streamable HTTP)
+- **数据库**: SQLite via Drizzle ORM (`bun:sqlite`)
+- **MCP**: `@modelcontextprotocol/sdk` + `@hono/mcp`
 
-## Project Structure
-
-```
-src/
-├── index.ts              # Entry point: server startup, MCP session management, traffic sync
-├── config.ts             # Environment config (TUNPILOT_PORT, TUNPILOT_BASE_URL, etc.)
-├── db/
-│   ├── schema.ts         # Drizzle schema: nodes, users, userNodes, subscriptions, trafficLogs, settings
-│   └── index.ts          # DB init (WAL mode, foreign keys)
-├── http/index.ts         # HTTP routes: /auth/:nodeId/:authSecret, /sub/:token, /health
-├── mcp/
-│   ├── index.ts          # MCP server factory
-│   └── tools/            # 20 MCP tools in 5 groups
-│       ├── nodes.ts      # Node CRUD (4 tools)
-│       ├── users.ts      # User CRUD (7 tools)
-│       ├── subscriptions.ts  # Subscription management (4 tools)
-│       ├── monitoring.ts # Health check & traffic stats (2 tools)
-│       └── settings.ts   # Settings management (3 tools)
-└── services/             # Business logic layer
-    ├── auth.ts           # 4-step Hysteria2 auth callback
-    ├── node.ts           # Node CRUD
-    ├── user.ts           # User CRUD + node assignment
-    ├── subscription.ts   # Subscription lifecycle
-    ├── settings.ts       # Settings CRUD (API key storage)
-    ├── traffic.ts        # Traffic sync from nodes + stats query
-    └── formats/          # Subscription format renderers (Format Registry pattern)
-        ├── index.ts      # Registry: registerFormat() / getFormat()
-        ├── shadowrocket.ts
-        ├── singbox.ts
-        ├── clash.ts
-        └── surge.ts
-plugin/                   # Claude Code plugin (skills auto-synced by CI)
-openclaw/                 # OpenClaw plugin (skills + gateway auto-registration)
-skills/                   # Shared skill definitions (source of truth, CI syncs to plugin/)
-scripts/deploy.sh         # One-click deployment to systemd
-scripts/tunpilot-diag.sh  # Node diagnostics wrapper (deployed to /usr/local/bin/tunpilot-diag)
-```
-
-## Commands
+## 常用命令
 
 ```sh
-bun run dev          # Hot reload development
-bun run start        # Production
-bun test             # Run all tests
-bun run db:push      # Sync Drizzle schema to SQLite
-bun run db:studio    # Drizzle Studio (DB browser)
+bun run dev       # 热重载开发
+bun run start     # 生产启动
+bun test          # 运行测试
+bun run db:push   # 同步 Drizzle schema 到 SQLite
 ```
 
-## Environment Variables
+## 规范
 
-Bun auto-loads `.env` — no dotenv needed.
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `TUNPILOT_PORT` | 3000 | Listen port |
-| `TUNPILOT_HOST` | 0.0.0.0 | Listen address |
-| `TUNPILOT_DB_PATH` | ./data/tunpilot.db | SQLite database path |
-| `TUNPILOT_BASE_URL` | http://localhost:3000 | External URL for subscription links |
-| `MCP_AUTH_TOKEN` | (empty) | Bearer token for /mcp endpoint |
-| `TRAFFIC_SYNC_INTERVAL` | 300000 | Traffic sync interval (ms) |
-
-## Key Patterns
-
-- **Auth flow**: Hysteria2 node → POST `/auth/:nodeId/:authSecret` → validate node → lookup user by password → check status/quota/expiry → check node permission
-- **Subscription formats**: implement `SubscriptionFormat` interface, call `registerFormat()` — auto-discovered on import
-- **Diagnostics**: handled by `testing-nodes` skill via direct SSH from the local machine — runs [xykt/IPQuality](https://github.com/xykt/IPQuality) and [xykt/NetQuality](https://github.com/xykt/NetQuality) on nodes
-- **MCP sessions**: per-client `McpServer` instances with 30-min TTL auto-cleanup
-- **Traffic sync**: periodic fetch from nodes' stats API → atomic transaction (insert logs + update used_bytes)
-- **Cascading deletes**: all FK relationships use ON DELETE CASCADE
-
-## Conventions
-
-- Use Bun APIs: `bun:sqlite`, `Bun.serve()`, `Bun.file()`, `bun test`
-- Don't use: express, better-sqlite3, dotenv, node:fs readFile/writeFile
-- Tests use `bun:test` with in-memory SQLite (`initDatabase(":memory:")`)
-- All database tables use UUID primary keys (except `trafficLogs` which uses auto-increment)
-- **Skills**: `skills/` is the single source of truth. Do NOT manually copy to `plugin/skills/` or `openclaw/skills/` — CI auto-syncs on push to main (`.github/workflows/sync-plugin-skills.yml`)
-- **Plugin version**: Bump `plugin/.claude-plugin/plugin.json` version when adding/removing skills — the marketplace caches by version number, so unchanged version = no update for users
+- 使用 Bun API：`bun:sqlite`、`Bun.serve()`、`Bun.file()`、`bun test`
+- 禁止使用：express、better-sqlite3、dotenv、node:fs readFile/writeFile
+- 测试使用 `bun:test` + 内存 SQLite (`initDatabase(":memory:")`)
+- 数据表主键均为 UUID（`trafficLogs` 除外，使用自增）
+- 所有外键关系使用 `ON DELETE CASCADE`
+- `skills/` 是 Skill 的唯一来源，CI 自动同步到 `plugin/skills/`，禁止手动复制
+- 增删 Skill 时需 bump `plugin/.claude-plugin/plugin.json` 的 version（marketplace 按版本号缓存）
