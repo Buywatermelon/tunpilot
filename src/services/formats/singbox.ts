@@ -106,6 +106,7 @@ export const singbox: SubscriptionFormat = {
           },
         ],
         auto_detect_interface: true,
+        default_domain_resolver: "dns-direct",
         final: "proxy",
       },
       experimental: {
