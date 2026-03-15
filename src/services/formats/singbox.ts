@@ -94,7 +94,7 @@ export const singbox: SubscriptionFormat = {
       },
       experimental: {
         clash_api: {
-          external_controller: "127.0.0.1:9090",
+          external_controller: "127.0.0.1:12081",
           external_ui: "ui",
           default_mode: "rule",
         },
