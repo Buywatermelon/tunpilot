@@ -19,17 +19,17 @@ export const singbox: SubscriptionFormat = {
         tls.insecure = true;
       }
       if (n.protocol === "trojan") {
-        return { type: "trojan" as const, tag: n.name, server: n.host, server_port: n.port, password: user.password, tls, domain_resolver: "dns-direct" };
+        return { type: "trojan" as const, tag: n.name, server: n.host, server_port: n.port, password: user.password, tls };
       }
-      return { type: "hysteria2" as const, tag: n.name, server: n.host, server_port: n.port, password: user.password, tls, domain_resolver: "dns-direct" };
+      return { type: "hysteria2" as const, tag: n.name, server: n.host, server_port: n.port, password: user.password, tls };
     });
 
     const config = {
       log: { level: "info", timestamp: true },
       dns: {
         servers: [
-          { type: "https", tag: "dns-remote", server: "dns.google", server_port: 443, path: "/dns-query", domain_resolver: "dns-direct" },
-          { type: "udp", tag: "dns-direct", server: "223.5.5.5", server_port: 53 },
+          { tag: "dns-remote", address: "https://dns.google/dns-query", address_resolver: "dns-direct" },
+          { tag: "dns-direct", address: "223.5.5.5", detour: "direct" },
         ],
         rules: [
           { rule_set: "geosite-cn", server: "dns-direct" },
@@ -106,7 +106,6 @@ export const singbox: SubscriptionFormat = {
           },
         ],
         auto_detect_interface: true,
-        default_domain_resolver: "dns-direct",
         final: "proxy",
       },
       experimental: {
