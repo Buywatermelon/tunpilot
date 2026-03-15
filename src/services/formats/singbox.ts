@@ -114,7 +114,7 @@ export const singbox: SubscriptionFormat = {
           store_rdrc: true,
         },
         clash_api: {
-          external_controller: "127.0.0.1:9090",
+          external_controller: "127.0.0.1:12081",
         },
       },
     };
