@@ -19,28 +19,39 @@ export const singbox: SubscriptionFormat = {
         tls.insecure = true;
       }
       if (n.protocol === "trojan") {
-        return { type: "trojan" as const, tag: n.name, server: n.host, server_port: n.port, password: user.password, tls };
+        return { type: "trojan" as const, tag: n.name, server: n.host, server_port: n.port, password: user.password, tls, domain_resolver: "dns-direct" };
       }
-      return { type: "hysteria2" as const, tag: n.name, server: n.host, server_port: n.port, password: user.password, tls };
+      return { type: "hysteria2" as const, tag: n.name, server: n.host, server_port: n.port, password: user.password, tls, domain_resolver: "dns-direct" };
     });
 
     const config = {
-      log: { level: "info" },
+      log: { level: "info", timestamp: true },
       dns: {
         servers: [
-          { tag: "google", address: "https://dns.google/dns-query" },
-          { tag: "local", address: "223.5.5.5", detour: "direct" },
+          { type: "https", tag: "dns-remote", server: "dns.google", server_port: 443, path: "/dns-query", domain_resolver: "dns-direct" },
+          { type: "udp", tag: "dns-direct", server: "223.5.5.5", server_port: 53 },
         ],
-        rules: [{ rule_set: "geosite-cn", server: "local" }],
+        rules: [
+          { rule_set: "geosite-cn", server: "dns-direct" },
+        ],
+        final: "dns-remote",
+        strategy: "prefer_ipv4",
+        independent_cache: true,
       },
       inbounds: [
         {
           type: "tun",
           tag: "tun-in",
-          address: ["172.19.0.1/30"],
+          address: ["172.19.0.1/30", "fdfe:dcba:9876::1/126"],
           auto_route: true,
           strict_route: true,
-          stack: "system",
+          stack: "mixed",
+        },
+        {
+          type: "mixed",
+          tag: "mixed-in",
+          listen: "127.0.0.1",
+          listen_port: 2080,
         },
       ],
       outbounds: [
@@ -54,18 +65,19 @@ export const singbox: SubscriptionFormat = {
           type: "urltest",
           tag: "auto",
           outbounds: [...nodeNames],
+          url: "https://www.gstatic.com/generate_204",
           interval: "5m",
         },
         ...proxyOutbounds,
         { type: "direct", tag: "direct" },
-        { type: "block", tag: "block" },
-        { type: "dns", tag: "dns-out" },
       ],
       route: {
         rules: [
-          { protocol: "dns", outbound: "dns-out" },
+          { action: "sniff" },
+          { protocol: "dns", action: "hijack-dns" },
+          { ip_is_private: true, outbound: "direct" },
           { rule_set: ["geosite-cn", "geoip-cn"], outbound: "direct" },
-          { rule_set: ["geosite-category-ads-all"], outbound: "block" },
+          { rule_set: ["geosite-category-ads-all"], action: "reject" },
         ],
         rule_set: [
           {
@@ -74,6 +86,7 @@ export const singbox: SubscriptionFormat = {
             format: "binary",
             url: "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs",
             download_detour: "direct",
+            update_interval: "1d",
           },
           {
             type: "remote",
@@ -81,6 +94,7 @@ export const singbox: SubscriptionFormat = {
             format: "binary",
             url: "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs",
             download_detour: "direct",
+            update_interval: "1d",
           },
           {
             type: "remote",
@@ -88,15 +102,20 @@ export const singbox: SubscriptionFormat = {
             format: "binary",
             url: "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs",
             download_detour: "direct",
+            update_interval: "1d",
           },
         ],
         auto_detect_interface: true,
+        default_domain_resolver: "dns-direct",
+        final: "proxy",
       },
       experimental: {
+        cache_file: {
+          enabled: true,
+          store_rdrc: true,
+        },
         clash_api: {
-          external_controller: "127.0.0.1:12081",
-          external_ui: "ui",
-          default_mode: "rule",
+          external_controller: "127.0.0.1:9090",
         },
       },
     };
