@@ -28,8 +28,8 @@ export const singbox: SubscriptionFormat = {
       log: { level: "info", timestamp: true },
       dns: {
         servers: [
-          { tag: "dns-remote", address: "https://dns.google/dns-query", address_resolver: "dns-direct" },
-          { tag: "dns-direct", address: "223.5.5.5", detour: "direct" },
+          { type: "https", tag: "dns-remote", server: "dns.google", server_port: 443, path: "/dns-query", domain_resolver: "dns-direct" },
+          { type: "udp", tag: "dns-direct", server: "223.5.5.5", server_port: 53, detour: "direct" },
         ],
         rules: [
           { rule_set: "geosite-cn", server: "dns-direct" },
