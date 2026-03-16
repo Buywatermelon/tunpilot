@@ -1,8 +1,9 @@
 import { eq, and } from "drizzle-orm";
 import type { Db } from "../../db/index";
 import { nodes, users, userNodes, type Node, type User } from "../../db/schema";
-import { getXrayClient } from "./pool";
+import { sshExec, sshWriteFile } from "./ssh";
 
+const DEFAULT_CONFIG_PATH = "/usr/local/etc/xray/config.json";
 const INBOUND_TAG = "trojan-in";
 
 export interface SyncError {
@@ -28,7 +29,7 @@ function isUserActive(user: User): boolean {
 }
 
 /** Get all Trojan nodes assigned to a user. */
-function getUserTrojanNodes(db: Db, userId: string): Node[] {
+export function getUserTrojanNodes(db: Db, userId: string): Node[] {
   return db
     .select({ node: nodes })
     .from(nodes)
@@ -50,9 +51,77 @@ function getNodeActiveUsers(db: Db, nodeId: string): User[] {
     .filter(isUserActive);
 }
 
+// Per-node lock to prevent concurrent config modifications
+const nodeLocks = new Map<string, Promise<unknown>>();
+
+function withNodeLock<T>(nodeId: string, fn: () => Promise<T>): Promise<T> {
+  const prev = nodeLocks.get(nodeId) ?? Promise.resolve();
+  const next = prev.then(() => fn(), () => fn());
+  nodeLocks.set(nodeId, next);
+  return next;
+}
+
 /**
- * Sync a single user to all their assigned Trojan nodes.
- * Active users are added; inactive users are removed.
+ * Deploy the desired user list to a Xray node's config file.
+ * Reads current config → updates clients array → writes back → restarts Xray (only if changed).
+ */
+export async function deployNodeUsers(db: Db, node: Node): Promise<ReconcileResult> {
+  return withNodeLock(node.id, async () => {
+    const result: ReconcileResult = {
+      nodeId: node.id,
+      nodeName: node.name,
+      added: 0,
+      removed: 0,
+      errors: [],
+    };
+
+    if (!node.ssh_user && !node.ssh_alias) {
+      result.errors.push("Node has no SSH config (ssh_user or ssh_alias required)");
+      return result;
+    }
+
+    try {
+      const activeUsers = getNodeActiveUsers(db, node.id);
+      const desiredClients = activeUsers
+        .map((u) => ({ password: u.password, email: u.name, level: 0 }))
+        .sort((a, b) => a.email.localeCompare(b.email));
+
+      const configPath = node.config_path || DEFAULT_CONFIG_PATH;
+      const configStr = await sshExec(node, `cat ${configPath}`);
+      const config = JSON.parse(configStr);
+
+      const trojanInbound = config.inbounds?.find((i: any) => i.tag === INBOUND_TAG);
+      if (!trojanInbound) {
+        result.errors.push(`Inbound '${INBOUND_TAG}' not found in config`);
+        return result;
+      }
+
+      const currentClients = (trojanInbound.settings?.clients || [])
+        .map((c: any) => ({ password: c.password, email: c.email, level: c.level ?? 0 }))
+        .sort((a: any, b: any) => a.email.localeCompare(b.email));
+
+      // Skip restart if config already matches desired state
+      if (JSON.stringify(desiredClients) === JSON.stringify(currentClients)) {
+        result.added = desiredClients.length;
+        return result;
+      }
+
+      trojanInbound.settings.clients = desiredClients;
+      await sshWriteFile(node, configPath, JSON.stringify(config, null, 2));
+      await sshExec(node, "systemctl restart xray");
+
+      result.added = desiredClients.length;
+    } catch (err: any) {
+      result.errors.push(err.message);
+    }
+
+    return result;
+  });
+}
+
+/**
+ * Sync a user's Trojan nodes: deploy desired config for each assigned node.
+ * Call AFTER making DB changes (user update, node assignment, etc.)
  */
 export async function syncUserToXrayNodes(db: Db, userId: string): Promise<SyncError[]> {
   const user = db.select().from(users).where(eq(users.id, userId)).get();
@@ -61,109 +130,30 @@ export async function syncUserToXrayNodes(db: Db, userId: string): Promise<SyncE
   const trojanNodes = getUserTrojanNodes(db, userId);
   if (trojanNodes.length === 0) return [];
 
-  const errors: SyncError[] = [];
-  const active = isUserActive(user);
-
-  await Promise.allSettled(
-    trojanNodes.map(async (node) => {
-      const client = await getXrayClient(node);
-      if (!client) return;
-
-      try {
-        if (active) {
-          // Remove first to ensure clean state, then add
-          try { await client.removeUser(INBOUND_TAG, user.name); } catch { /* ignore if not exists */ }
-          await client.addUser(INBOUND_TAG, user.name, user.password);
-        } else {
-          await client.removeUser(INBOUND_TAG, user.name);
-        }
-      } catch (err: any) {
-        errors.push({ nodeId: node.id, nodeName: node.name, error: err.message });
-      }
-    })
-  );
-
-  return errors;
+  return deployNodes(db, trojanNodes);
 }
 
 /**
- * Remove a user from specified Trojan nodes (or all assigned Trojan nodes).
- * Used before user deletion or node unassignment.
+ * Deploy config for specific Trojan nodes (used after user removal from nodes).
+ * Call AFTER removing the user-node association from DB.
  */
-export async function removeUserFromXrayNodes(
-  db: Db,
-  userId: string,
-  nodeIds?: string[]
-): Promise<SyncError[]> {
-  const user = db.select().from(users).where(eq(users.id, userId)).get();
-  if (!user) return [];
+export async function syncTrojanNodes(db: Db, nodeIds: string[]): Promise<SyncError[]> {
+  const trojanNodes = nodeIds
+    .map((id) => db.select().from(nodes).where(and(eq(nodes.id, id), eq(nodes.protocol, "trojan"))).get())
+    .filter((n): n is Node => n !== undefined);
 
-  let trojanNodes: Node[];
-  if (nodeIds) {
-    trojanNodes = nodeIds
-      .map((id) => db.select().from(nodes).where(and(eq(nodes.id, id), eq(nodes.protocol, "trojan"))).get())
-      .filter((n): n is Node => n !== undefined);
-  } else {
-    trojanNodes = getUserTrojanNodes(db, userId);
-  }
-
-  const errors: SyncError[] = [];
-
-  await Promise.allSettled(
-    trojanNodes.map(async (node) => {
-      const client = await getXrayClient(node);
-      if (!client) return;
-
-      try {
-        await client.removeUser(INBOUND_TAG, user.name);
-      } catch (err: any) {
-        // Ignore "not found" errors — user may not exist on the node
-        if (!err.message?.includes("not found")) {
-          errors.push({ nodeId: node.id, nodeName: node.name, error: err.message });
-        }
-      }
-    })
-  );
-
-  return errors;
+  return deployNodes(db, trojanNodes);
 }
 
 /**
- * Reconcile a single Trojan node: ensure it has exactly the right users.
- * Strategy: remove-then-add every expected user (idempotent upsert).
+ * Reconcile a single Trojan node: deploy desired user config.
  */
 export async function reconcileXrayNode(db: Db, node: Node): Promise<ReconcileResult> {
-  const result: ReconcileResult = {
-    nodeId: node.id,
-    nodeName: node.name,
-    added: 0,
-    removed: 0,
-    errors: [],
-  };
-
-  const client = await getXrayClient(node);
-  if (!client) {
-    result.errors.push("No gRPC client (missing stats_port?)");
-    return result;
-  }
-
-  const activeUsers = getNodeActiveUsers(db, node.id);
-
-  for (const user of activeUsers) {
-    try {
-      try { await client.removeUser(INBOUND_TAG, user.name); } catch { /* ok */ }
-      await client.addUser(INBOUND_TAG, user.name, user.password);
-      result.added++;
-    } catch (err: any) {
-      result.errors.push(`${user.name}: ${err.message}`);
-    }
-  }
-
-  return result;
+  return deployNodeUsers(db, node);
 }
 
 /**
- * Full reconciliation: ensure every enabled Trojan node has exactly the right users.
+ * Full reconciliation: deploy desired config for every enabled Trojan node.
  */
 export async function reconcileAllXrayNodes(db: Db): Promise<ReconcileResult[]> {
   const trojanNodes = db
@@ -175,7 +165,7 @@ export async function reconcileAllXrayNodes(db: Db): Promise<ReconcileResult[]> 
   if (trojanNodes.length === 0) return [];
 
   const settled = await Promise.allSettled(
-    trojanNodes.map((node) => reconcileXrayNode(db, node))
+    trojanNodes.map((node) => deployNodeUsers(db, node))
   );
 
   return settled.map((r, i) =>
@@ -183,4 +173,23 @@ export async function reconcileAllXrayNodes(db: Db): Promise<ReconcileResult[]> 
       ? r.value
       : { nodeId: trojanNodes[i]!.id, nodeName: trojanNodes[i]!.name, added: 0, removed: 0, errors: [String(r.reason)] }
   );
+}
+
+/** Internal: deploy config for multiple nodes and collect errors. */
+async function deployNodes(db: Db, trojanNodes: Node[]): Promise<SyncError[]> {
+  const errors: SyncError[] = [];
+  const settled = await Promise.allSettled(
+    trojanNodes.map((node) => deployNodeUsers(db, node))
+  );
+
+  for (let i = 0; i < settled.length; i++) {
+    const r = settled[i]!;
+    if (r.status === "fulfilled" && r.value.errors.length > 0) {
+      errors.push({ nodeId: trojanNodes[i]!.id, nodeName: trojanNodes[i]!.name, error: r.value.errors.join("; ") });
+    } else if (r.status === "rejected") {
+      errors.push({ nodeId: trojanNodes[i]!.id, nodeName: trojanNodes[i]!.name, error: String(r.reason) });
+    }
+  }
+
+  return errors;
 }

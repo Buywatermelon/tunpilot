@@ -12,7 +12,8 @@ import {
 } from "./user";
 import {
   syncUserToXrayNodes,
-  removeUserFromXrayNodes,
+  syncTrojanNodes,
+  getUserTrojanNodes,
 } from "./xray/sync";
 
 /**
@@ -38,20 +39,27 @@ export async function updateUserWithSync(
 }
 
 /**
- * Delete a user after removing from all Xray nodes.
+ * Delete a user and sync config to remove them from all Xray nodes.
+ * Gets affected nodes BEFORE deletion, then deploys config AFTER.
  */
 export async function deleteUserWithSync(db: Db, id: string): Promise<void> {
-  // Remove from Xray nodes before DB deletion (need user data for gRPC call)
-  const errors = await removeUserFromXrayNodes(db, id);
-  if (errors.length > 0) {
-    console.warn(`Xray removal errors for user ${id}:`, errors);
-  }
+  // Snapshot affected Trojan node IDs before deletion
+  const affectedNodeIds = getUserTrojanNodes(db, id).map((n) => n.id);
 
+  // Delete from DB (CASCADE removes userNodes)
   deleteUser(db, id);
+
+  // Deploy config for affected nodes (user is now gone)
+  if (affectedNodeIds.length > 0) {
+    const errors = await syncTrojanNodes(db, affectedNodeIds);
+    if (errors.length > 0) {
+      console.warn(`Xray sync errors after deleting user ${id}:`, errors);
+    }
+  }
 }
 
 /**
- * Assign nodes to a user and sync Xray state for newly added/removed Trojan nodes.
+ * Assign nodes to a user and sync Xray config for all affected Trojan nodes.
  */
 export async function assignNodesWithSync(
   db: Db,
@@ -69,22 +77,16 @@ export async function assignNodesWithSync(
   const newNodes = getUserNodes(db, userId);
   const newTrojanIds = new Set(newNodes.filter((n) => n.protocol === "trojan").map((n) => n.id));
 
-  // Remove user from Trojan nodes that were unassigned
-  const removedIds = [...oldTrojanIds].filter((id) => !newTrojanIds.has(id));
-  if (removedIds.length > 0) {
-    const errors = await removeUserFromXrayNodes(db, userId, removedIds);
-    if (errors.length > 0) console.warn(`Xray removal errors:`, errors);
-  }
-
-  // Add user to newly assigned Trojan nodes
-  if (newTrojanIds.size > 0) {
-    const errors = await syncUserToXrayNodes(db, userId);
+  // Deploy config for all affected nodes (both removed and added)
+  const allAffectedIds = [...new Set([...oldTrojanIds, ...newTrojanIds])];
+  if (allAffectedIds.length > 0) {
+    const errors = await syncTrojanNodes(db, allAffectedIds);
     if (errors.length > 0) console.warn(`Xray sync errors:`, errors);
   }
 }
 
 /**
- * Add a single node to a user and sync Xray state if it's a Trojan node.
+ * Add a single node to a user and sync Xray config if it's a Trojan node.
  */
 export async function addNodeWithSync(
   db: Db,
@@ -94,12 +96,12 @@ export async function addNodeWithSync(
   const added = addNodeToUser(db, userId, nodeId);
   if (!added) return { added: false, errors: [] };
 
-  const errors = await syncUserToXrayNodes(db, userId);
+  const errors = await syncTrojanNodes(db, [nodeId]);
   return { added: true, errors };
 }
 
 /**
- * Remove a single node from a user and sync Xray state if it's a Trojan node.
+ * Remove a single node from a user and sync Xray config.
  */
 export async function removeNodeWithSync(
   db: Db,
@@ -109,18 +111,17 @@ export async function removeNodeWithSync(
   const removed = removeNodeFromUser(db, userId, nodeId);
   if (!removed) return { removed: false, errors: [] };
 
-  const errors = await removeUserFromXrayNodes(db, userId, [nodeId]);
+  // User is already removed from this node in DB; deploy to update config
+  const errors = await syncTrojanNodes(db, [nodeId]);
   return { removed: true, errors };
 }
 
 /**
- * Reset traffic in DB and reset Xray stats for the user's Trojan nodes.
+ * Reset traffic in DB and re-sync user to Xray nodes (re-enables if quota-disabled).
  */
 export async function resetTrafficWithSync(db: Db, userId: string): Promise<void> {
   resetTraffic(db, userId);
 
-  // Re-sync user to Xray nodes — if the user was previously removed due to
-  // exceeded quota, this re-adds them now that used_bytes is reset to 0.
   const errors = await syncUserToXrayNodes(db, userId);
   if (errors.length > 0) {
     console.warn(`Xray sync errors after traffic reset for user ${userId}:`, errors);

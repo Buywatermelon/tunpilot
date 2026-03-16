@@ -1,45 +1,52 @@
-import { test, expect, beforeEach, afterEach, describe, mock } from "bun:test";
+import { test, expect, beforeEach, afterEach, describe, mock, spyOn } from "bun:test";
 import { initDatabase, type Db } from "../../db/index";
 import { addNode } from "../node";
 import { createUser, assignNodesToUser } from "../user";
 import { users } from "../../db/schema";
 import { eq } from "drizzle-orm";
 import type { Node, User } from "../../db/schema";
-import { setClientFactory, closeAllXrayClients } from "./pool";
+import * as sshModule from "./ssh";
 import {
   syncUserToXrayNodes,
-  removeUserFromXrayNodes,
+  syncTrojanNodes,
   reconcileAllXrayNodes,
 } from "./sync";
 
-// Mock XrayClient that records calls
-const mockAddUser = mock(() => Promise.resolve());
-const mockRemoveUser = mock(() => Promise.resolve());
-const mockQueryTraffic = mock(() => Promise.resolve(new Map()));
-
-function createMockClient() {
-  return {
-    addUser: mockAddUser,
-    removeUser: mockRemoveUser,
-    queryTraffic: mockQueryTraffic,
-    close: mock(() => {}),
-  } as any;
-}
-
 let db: Db;
+
+// Mock SSH operations — sshExec and sshWriteFile
+const mockSshExec = spyOn(sshModule, "sshExec");
+const mockSshWriteFile = spyOn(sshModule, "sshWriteFile");
+
+// Base Xray config returned by sshExec when reading config file
+function makeXrayConfig(clients: any[] = []) {
+  return JSON.stringify({
+    log: { loglevel: "warning" },
+    inbounds: [{
+      tag: "trojan-in",
+      port: 443,
+      protocol: "trojan",
+      settings: { clients },
+    }],
+    outbounds: [{ tag: "direct", protocol: "freedom" }],
+  });
+}
 
 beforeEach(() => {
   db = initDatabase(":memory:");
-  mockAddUser.mockClear();
-  mockRemoveUser.mockClear();
-  mockQueryTraffic.mockClear();
-  // Inject mock client factory
-  closeAllXrayClients();
-  setClientFactory(() => createMockClient());
+  mockSshExec.mockReset();
+  mockSshWriteFile.mockReset();
+
+  // Default: sshExec returns empty config for "cat" and succeeds for "systemctl restart"
+  mockSshExec.mockImplementation(async (_node: Node, cmd: string) => {
+    if (cmd.startsWith("cat ")) return makeXrayConfig();
+    if (cmd.startsWith("systemctl")) return "";
+    return "";
+  });
+  mockSshWriteFile.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
-  closeAllXrayClients();
   db?.$client?.close();
 });
 
@@ -50,6 +57,7 @@ function createTrojanNode(name: string = "trojan-us"): Node {
     port: 443,
     protocol: "trojan",
     stats_port: 10085,
+    ssh_user: "root",
   });
 }
 
@@ -69,7 +77,7 @@ function createTestUser(name: string = "testuser"): User {
 }
 
 describe("syncUserToXrayNodes", () => {
-  test("为活跃用户在 Trojan 节点上添加用户", async () => {
+  test("为活跃用户部署配置到 Trojan 节点", async () => {
     const node = createTrojanNode();
     const user = createTestUser();
     assignNodesToUser(db, user.id, [node.id]);
@@ -77,11 +85,18 @@ describe("syncUserToXrayNodes", () => {
     const errors = await syncUserToXrayNodes(db, user.id);
 
     expect(errors).toHaveLength(0);
-    expect(mockRemoveUser).toHaveBeenCalled();
-    expect(mockAddUser).toHaveBeenCalledWith("trojan-in", user.name, user.password);
+    // Should write config with the user's password
+    expect(mockSshWriteFile).toHaveBeenCalled();
+    const writtenConfig = JSON.parse(mockSshWriteFile.mock.calls[0]![2] as string);
+    const clients = writtenConfig.inbounds[0].settings.clients;
+    expect(clients).toHaveLength(1);
+    expect(clients[0].email).toBe(user.name);
+    expect(clients[0].password).toBe(user.password);
+    // Should restart xray
+    expect(mockSshExec).toHaveBeenCalledWith(expect.anything(), "systemctl restart xray");
   });
 
-  test("不对 Hysteria2 节点进行 gRPC 操作", async () => {
+  test("不对 Hysteria2 节点进行操作", async () => {
     const node = createHy2Node();
     const user = createTestUser();
     assignNodesToUser(db, user.id, [node.id]);
@@ -89,52 +104,69 @@ describe("syncUserToXrayNodes", () => {
     const errors = await syncUserToXrayNodes(db, user.id);
 
     expect(errors).toHaveLength(0);
-    expect(mockAddUser).not.toHaveBeenCalled();
-    expect(mockRemoveUser).not.toHaveBeenCalled();
+    expect(mockSshWriteFile).not.toHaveBeenCalled();
   });
 
-  test("为禁用用户移除 Xray 访问", async () => {
+  test("为禁用用户部署空客户端列表", async () => {
     const node = createTrojanNode();
     const user = createTestUser();
     assignNodesToUser(db, user.id, [node.id]);
 
     db.update(users).set({ enabled: 0 }).where(eq(users.id, user.id)).run();
 
+    // Config currently has the user, so deploying should remove them
+    mockSshExec.mockImplementation(async (_node: Node, cmd: string) => {
+      if (cmd.startsWith("cat ")) return makeXrayConfig([{ password: user.password, email: user.name, level: 0 }]);
+      return "";
+    });
+
     const errors = await syncUserToXrayNodes(db, user.id);
 
     expect(errors).toHaveLength(0);
-    expect(mockRemoveUser).toHaveBeenCalledWith("trojan-in", user.name);
-    expect(mockAddUser).not.toHaveBeenCalled();
+    const writtenConfig = JSON.parse(mockSshWriteFile.mock.calls[0]![2] as string);
+    expect(writtenConfig.inbounds[0].settings.clients).toHaveLength(0);
   });
 
   test("用户不存在时返回空错误列表", async () => {
     const errors = await syncUserToXrayNodes(db, "nonexistent-id");
     expect(errors).toHaveLength(0);
   });
-});
 
-describe("removeUserFromXrayNodes", () => {
-  test("从指定 Trojan 节点移除用户", async () => {
+  test("配置未变化时跳过重启", async () => {
     const node = createTrojanNode();
     const user = createTestUser();
     assignNodesToUser(db, user.id, [node.id]);
 
-    const errors = await removeUserFromXrayNodes(db, user.id, [node.id]);
+    // Config already has this user
+    mockSshExec.mockImplementation(async (_node: Node, cmd: string) => {
+      if (cmd.startsWith("cat ")) return makeXrayConfig([{ password: user.password, email: user.name, level: 0 }]);
+      return "";
+    });
+
+    const errors = await syncUserToXrayNodes(db, user.id);
 
     expect(errors).toHaveLength(0);
-    expect(mockRemoveUser).toHaveBeenCalledWith("trojan-in", user.name);
+    expect(mockSshWriteFile).not.toHaveBeenCalled(); // No write needed
+  });
+});
+
+describe("syncTrojanNodes", () => {
+  test("部署配置到指定 Trojan 节点", async () => {
+    const node = createTrojanNode();
+    const user = createTestUser();
+    assignNodesToUser(db, user.id, [node.id]);
+
+    const errors = await syncTrojanNodes(db, [node.id]);
+
+    expect(errors).toHaveLength(0);
+    expect(mockSshWriteFile).toHaveBeenCalled();
   });
 
-  test("从所有分配的 Trojan 节点移除用户", async () => {
-    const node1 = createTrojanNode("trojan-1");
-    const node2 = createTrojanNode("trojan-2");
-    const user = createTestUser();
-    assignNodesToUser(db, user.id, [node1.id, node2.id]);
-
-    const errors = await removeUserFromXrayNodes(db, user.id);
-
+  test("忽略非 Trojan 节点", async () => {
+    const node = createHy2Node();
+    const errors = await syncTrojanNodes(db, [node.id]);
     expect(errors).toHaveLength(0);
-    expect(mockRemoveUser).toHaveBeenCalledTimes(2);
+    expect(mockSshWriteFile).not.toHaveBeenCalled();
   });
 });
 
@@ -160,9 +192,9 @@ describe("reconcileAllXrayNodes", () => {
     expect(results).toHaveLength(0);
   });
 
-  test("跳过未配置 stats_port 的 Trojan 节点", async () => {
+  test("无 SSH 配置的 Trojan 节点报错", async () => {
     addNode(db, {
-      name: "no-api",
+      name: "no-ssh",
       host: "203.0.113.3",
       port: 443,
       protocol: "trojan",
@@ -171,6 +203,6 @@ describe("reconcileAllXrayNodes", () => {
     const results = await reconcileAllXrayNodes(db);
 
     expect(results).toHaveLength(1);
-    expect(results[0]!.errors[0]).toContain("No gRPC client");
+    expect(results[0]!.errors[0]).toContain("no SSH config");
   });
 });
