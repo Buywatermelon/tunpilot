@@ -6,6 +6,7 @@ import { createMcpServer } from "./mcp/index.ts";
 import { startTrafficSync, cleanupOldTrafficLogs } from "./services/traffic.ts";
 import { reconcileAllXrayNodes } from "./services/xray/sync.ts";
 import { closeAllXrayClients } from "./services/xray/pool.ts";
+import { closeAllTunnels } from "./services/xray/tunnel.ts";
 import {
   StreamableHTTPTransport,
   bearerAuth,
@@ -121,6 +122,7 @@ function shutdown() {
   clearInterval(sessionCleanup);
   clearInterval(xrayReconcileTimer);
   closeAllXrayClients();
+  closeAllTunnels();
   server.stop();
   db.$client.close();
   process.exit(0);

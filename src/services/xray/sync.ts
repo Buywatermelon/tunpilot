@@ -66,7 +66,7 @@ export async function syncUserToXrayNodes(db: Db, userId: string): Promise<SyncE
 
   await Promise.allSettled(
     trojanNodes.map(async (node) => {
-      const client = getXrayClient(node);
+      const client = await getXrayClient(node);
       if (!client) return;
 
       try {
@@ -111,7 +111,7 @@ export async function removeUserFromXrayNodes(
 
   await Promise.allSettled(
     trojanNodes.map(async (node) => {
-      const client = getXrayClient(node);
+      const client = await getXrayClient(node);
       if (!client) return;
 
       try {
@@ -141,7 +141,7 @@ export async function reconcileXrayNode(db: Db, node: Node): Promise<ReconcileRe
     errors: [],
   };
 
-  const client = getXrayClient(node);
+  const client = await getXrayClient(node);
   if (!client) {
     result.errors.push("No gRPC client (missing stats_port?)");
     return result;

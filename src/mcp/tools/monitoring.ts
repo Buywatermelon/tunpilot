@@ -33,7 +33,7 @@ export function register(server: McpServer, db: Db, _baseUrl: string) {
             try {
               if (node.protocol === "trojan") {
                 // Xray/Trojan: gRPC health check via QueryStats
-                const client = getXrayClient(node);
+                const client = await getXrayClient(node);
                 if (client) {
                   await client.queryTraffic(false);
                   return { ...base, status: "online" as const };

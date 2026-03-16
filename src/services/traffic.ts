@@ -28,7 +28,7 @@ export interface TrafficStat {
 async function syncTrafficFromXrayNode(db: Db, node: Node): Promise<SyncResult> {
   const result: SyncResult = { nodeId: node.id, synced: 0, errors: [] };
 
-  const client = getXrayClient(node);
+  const client = await getXrayClient(node);
   if (!client) {
     result.errors.push(`No gRPC client for node ${node.name}`);
     return result;
