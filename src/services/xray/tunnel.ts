@@ -1,5 +1,7 @@
 import type { Node } from "../../db/schema";
 import type { Subprocess } from "bun";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 interface Tunnel {
   localPort: number;
@@ -16,8 +18,8 @@ export function needsTunnel(node: Node): boolean {
 /** Get the SSH target string for a node. */
 function sshTarget(node: Node): string[] {
   if (node.ssh_alias) {
-    // Include explicit config path so Bun.spawn child process can resolve aliases
-    return ["-F", `${process.env.HOME || "/root"}/.ssh/config`, node.ssh_alias];
+    const sshConfig = join(homedir(), ".ssh", "config");
+    return ["-F", sshConfig, node.ssh_alias];
   }
   const port = node.ssh_port ?? 22;
   const target = `${node.ssh_user}@${node.host}`;
