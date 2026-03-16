@@ -1,10 +1,11 @@
 import * as grpc from "@grpc/grpc-js";
 import * as protoLoader from "@grpc/proto-loader";
+import * as protobuf from "protobufjs";
 import { join } from "node:path";
 
 const PROTO_DIR = join(import.meta.dir, "proto");
 
-// Load proto definitions once at module level
+// Load proto definitions for gRPC service constructors
 const handlerDef = protoLoader.loadSync(join(PROTO_DIR, "handler.proto"), {
   keepCase: false,
   longs: Number,
@@ -23,28 +24,25 @@ const statsDef = protoLoader.loadSync(join(PROTO_DIR, "stats.proto"), {
 });
 const statsProto = grpc.loadPackageDefinition(statsDef);
 
-const trojanDef = protoLoader.loadSync(join(PROTO_DIR, "trojan.proto"), {
-  keepCase: false,
-  longs: Number,
-  enums: String,
-  defaults: true,
-  oneofs: true,
-});
-const trojanProto = grpc.loadPackageDefinition(trojanDef);
+// Load proto definitions with protobufjs for message encoding
+const protoRoot = protobuf.loadSync([
+  join(PROTO_DIR, "handler.proto"),
+  join(PROTO_DIR, "trojan.proto"),
+]);
 
-// Extract service constructors
+// Extract service constructors (from grpc-js)
 const HandlerService = (handlerProto.xray as any).app.proxyman.command.HandlerService;
 const StatsService = (statsProto.xray as any).app.stats.command.StatsService;
-const TrojanAccount = (trojanProto.xray as any).proxy.trojan.Account;
+
+// Extract message types for encoding (from protobufjs)
+const TrojanAccount = protoRoot.lookupType("xray.proxy.trojan.Account");
+const AddUserOperation = protoRoot.lookupType("xray.app.proxyman.command.AddUserOperation");
+const RemoveUserOperation = protoRoot.lookupType("xray.app.proxyman.command.RemoveUserOperation");
 
 // Xray uses fully-qualified type names for TypedMessage
+const TROJAN_ACCOUNT_TYPE = "xray.proxy.trojan.Account";
 const ADD_USER_OP_TYPE = "xray.app.proxyman.command.AddUserOperation";
 const REMOVE_USER_OP_TYPE = "xray.app.proxyman.command.RemoveUserOperation";
-const TROJAN_ACCOUNT_TYPE = "xray.proxy.trojan.Account";
-
-// Extract message types for manual serialization
-const AddUserOperation = (handlerProto.xray as any).app.proxyman.command.AddUserOperation;
-const RemoveUserOperation = (handlerProto.xray as any).app.proxyman.command.RemoveUserOperation;
 
 export interface TrafficData {
   tx: number;
