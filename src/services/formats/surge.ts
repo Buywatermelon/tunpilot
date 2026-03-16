@@ -13,7 +13,8 @@ function renderProxyLine(node: Node, password: string): string {
   ];
   if (node.cert_fingerprint && node.protocol === "trojan") {
     parts.push(`server-cert-fingerprint-sha256=${node.cert_fingerprint}`);
-  } else if (node.insecure === 1) {
+  }
+  if (node.insecure === 1) {
     parts.push("skip-cert-verify=true");
   }
   return parts.join(", ");

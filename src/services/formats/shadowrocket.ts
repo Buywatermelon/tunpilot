@@ -22,16 +22,13 @@ function buildTrojanUri(
   port: number,
   sni: string | null,
   insecure: number | null,
-  certFingerprint: string | null,
   name: string
 ): string {
   const serverName = sni || host;
   const encodedPassword = encodeURIComponent(password);
   const encodedName = encodeURIComponent(name);
   const params = [`sni=${serverName}`];
-  if (certFingerprint) {
-    params.push(`peer=${certFingerprint}`);
-  } else if (insecure) {
+  if (insecure) {
     params.push("allowInsecure=1");
   }
   return `trojan://${encodedPassword}@${host}:${port}?${params.join("&")}#${encodedName}`;
@@ -39,7 +36,9 @@ function buildTrojanUri(
 
 function buildProxyUri(node: Node, password: string): string {
   if (node.protocol === "trojan") {
-    return buildTrojanUri(password, node.host, node.port, node.sni, node.insecure, node.cert_fingerprint, node.name);
+    // trojan:// URI has no standard cert fingerprint pinning param;
+    // for self-signed certs, allowInsecure=1 is the only option
+    return buildTrojanUri(password, node.host, node.port, node.sni, node.insecure, node.name);
   }
   return buildHy2Uri(password, node.host, node.port, node.sni, node.insecure, node.name);
 }

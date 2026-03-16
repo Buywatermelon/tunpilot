@@ -18,7 +18,8 @@ export const clash: SubscriptionFormat = {
     sni: ${sni}`;
         if (n.cert_fingerprint && n.protocol === "trojan") {
           entry += `\n    fingerprint: ${n.cert_fingerprint}`;
-        } else if (n.insecure) {
+        }
+        if (n.insecure) {
           entry += `\n    skip-cert-verify: true`;
         }
         return entry;
