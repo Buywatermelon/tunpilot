@@ -74,6 +74,9 @@ sysctl -n net.core.somaxconn 2>/dev/null
 sysctl -n net.ipv4.tcp_congestion_control 2>/dev/null
 sysctl -n net.core.default_qdisc 2>/dev/null
 sysctl -n net.ipv4.tcp_fastopen 2>/dev/null
+
+echo "=== DISK ==="
+df -h / 2>/dev/null
 PROBE
 ```
 
@@ -132,8 +135,10 @@ SYSCTL
 
 ### 2.2 Install Xray-core
 
+Ensure prerequisites are installed, then install Xray:
+
 ```bash
-ssh <server> 'bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install'
+ssh <server> 'apt-get update -qq && apt-get install -y -qq unzip curl && bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install'
 ```
 
 Verify installation:
@@ -266,7 +271,7 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=/usr/local/etc/xray /etc/xray
+ReadWritePaths=/usr/local/etc/xray /etc/xray /var/log/xray
 EOF
 
 systemctl daemon-reload

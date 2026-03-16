@@ -8,6 +8,8 @@ Production-grade Xray-core Trojan server configuration. Two variants are provide
 
 Use this when a domain name points to the server's IP. Certificates are managed externally by certbot/acme.sh.
 
+> **Note**: The `api.listen` field makes Xray's built-in API listen directly — do NOT add a separate `dokodemo-door` inbound for the API port, or you'll get a "bind: address already in use" error.
+
 ```json
 {
   "log": {
@@ -67,15 +69,6 @@ Use this when a domain name points to the server's IP. Certificates are managed 
           ]
         }
       }
-    },
-    {
-      "tag": "api-in",
-      "listen": "127.0.0.1",
-      "port": {{API_PORT}},
-      "protocol": "dokodemo-door",
-      "settings": {
-        "address": "127.0.0.1"
-      }
     }
   ],
   "outbounds": [
@@ -90,13 +83,6 @@ Use this when a domain name points to the server's IP. Certificates are managed 
   ],
   "routing": {
     "rules": [
-      {
-        "inboundTag": [
-          "api-in"
-        ],
-        "outboundTag": "api",
-        "type": "field"
-      },
       {
         "type": "field",
         "protocol": [
@@ -115,6 +101,8 @@ Use this when a domain name points to the server's IP. Certificates are managed 
 
 Use this when no domain is available. Identical to Config A except certificate paths point to self-signed certs. Clients use `pinnedPeerCertificateChainSha256` (or equivalent) instead of `allowInsecure`.
 
+> **Note**: The `api.listen` field makes Xray's built-in API listen directly — do NOT add a separate `dokodemo-door` inbound for the API port, or you'll get a "bind: address already in use" error.
+
 ```json
 {
   "log": {
@@ -174,15 +162,6 @@ Use this when no domain is available. Identical to Config A except certificate p
           ]
         }
       }
-    },
-    {
-      "tag": "api-in",
-      "listen": "127.0.0.1",
-      "port": {{API_PORT}},
-      "protocol": "dokodemo-door",
-      "settings": {
-        "address": "127.0.0.1"
-      }
     }
   ],
   "outbounds": [
@@ -197,13 +176,6 @@ Use this when no domain is available. Identical to Config A except certificate p
   ],
   "routing": {
     "rules": [
-      {
-        "inboundTag": [
-          "api-in"
-        ],
-        "outboundTag": "api",
-        "type": "field"
-      },
       {
         "type": "field",
         "protocol": [
@@ -242,7 +214,9 @@ If you don't need a fallback website, the default `{"dest": 80}` will simply ret
 
 ### gRPC API Security
 
-The `api.listen` and `api-in` inbound are both bound to `127.0.0.1`. The gRPC API is **never exposed to the public internet**. TunPilot accesses it via SSH tunnel (`ssh -L`) when syncing users or querying stats.
+The `api.listen` field binds the gRPC API to `127.0.0.1`, so it is **never exposed to the public internet**. TunPilot accesses it via SSH tunnel (`ssh -L`) when syncing users or querying stats.
+
+> **Important**: Do NOT add a `dokodemo-door` inbound on the same API port. The `api.listen` field handles this directly. Using both will cause a "bind: address already in use" error.
 
 ### Empty Clients Array
 
