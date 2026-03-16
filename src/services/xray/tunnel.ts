@@ -1,7 +1,5 @@
 import type { Node } from "../../db/schema";
 import type { Subprocess } from "bun";
-import { homedir } from "node:os";
-import { join } from "node:path";
 
 interface Tunnel {
   localPort: number;
@@ -15,15 +13,14 @@ export function needsTunnel(node: Node): boolean {
   return !!(node.ssh_alias || node.ssh_user);
 }
 
-/** Get the SSH target string for a node. */
+/** Get the SSH args for connecting to a node. */
 function sshTarget(node: Node): string[] {
-  if (node.ssh_alias) {
-    const sshConfig = join(homedir(), ".ssh", "config");
-    return ["-F", sshConfig, node.ssh_alias];
-  }
+  // Always use explicit connection info for reliability in background processes.
+  // SSH config aliases may not resolve in all contexts (nohup, systemd, etc.)
+  const host = node.host;
+  const user = node.ssh_user || "root";
   const port = node.ssh_port ?? 22;
-  const target = `${node.ssh_user}@${node.host}`;
-  return port === 22 ? [target] : ["-p", String(port), target];
+  return ["-p", String(port), `${user}@${host}`];
 }
 
 /** Find a free local port by briefly listening on port 0. */
