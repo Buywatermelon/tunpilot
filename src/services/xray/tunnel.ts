@@ -14,12 +14,14 @@ export function needsTunnel(node: Node): boolean {
 }
 
 /** Get the SSH target string for a node. */
-function sshTarget(node: Node): string {
-  if (node.ssh_alias) return node.ssh_alias;
+function sshTarget(node: Node): string[] {
+  if (node.ssh_alias) {
+    // Include explicit config path so Bun.spawn child process can resolve aliases
+    return ["-F", `${process.env.HOME || "/root"}/.ssh/config`, node.ssh_alias];
+  }
   const port = node.ssh_port ?? 22;
-  return port === 22
-    ? `${node.ssh_user}@${node.host}`
-    : `-p ${port} ${node.ssh_user}@${node.host}`;
+  const target = `${node.ssh_user}@${node.host}`;
+  return port === 22 ? [target] : ["-p", String(port), target];
 }
 
 /** Find a free local port by briefly listening on port 0. */
@@ -83,7 +85,7 @@ export async function ensureTunnel(node: Node): Promise<number> {
     "-o", "ServerAliveCountMax=3",
     "-o", "StrictHostKeyChecking=accept-new",
     "-L", `${localPort}:127.0.0.1:${remotePort}`,
-    ...target.split(" "),
+    ...target,
   ];
 
   const proc = Bun.spawn(args, {
