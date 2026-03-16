@@ -5,6 +5,8 @@ import {
   deleteUser,
   resetTraffic,
   assignNodesToUser,
+  addNodeToUser,
+  removeNodeFromUser,
   getUserNodes,
   type UpdateUserParams,
 } from "./user";
@@ -79,6 +81,36 @@ export async function assignNodesWithSync(
     const errors = await syncUserToXrayNodes(db, userId);
     if (errors.length > 0) console.warn(`Xray sync errors:`, errors);
   }
+}
+
+/**
+ * Add a single node to a user and sync Xray state if it's a Trojan node.
+ */
+export async function addNodeWithSync(
+  db: Db,
+  userId: string,
+  nodeId: string
+): Promise<{ added: boolean; errors: string[] }> {
+  const added = addNodeToUser(db, userId, nodeId);
+  if (!added) return { added: false, errors: [] };
+
+  const errors = await syncUserToXrayNodes(db, userId);
+  return { added: true, errors };
+}
+
+/**
+ * Remove a single node from a user and sync Xray state if it's a Trojan node.
+ */
+export async function removeNodeWithSync(
+  db: Db,
+  userId: string,
+  nodeId: string
+): Promise<{ removed: boolean; errors: string[] }> {
+  const removed = removeNodeFromUser(db, userId, nodeId);
+  if (!removed) return { removed: false, errors: [] };
+
+  const errors = await removeUserFromXrayNodes(db, userId, [nodeId]);
+  return { removed: true, errors };
 }
 
 /**

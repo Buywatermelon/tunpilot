@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import type { Db } from "../db/index";
 import { users, nodes, userNodes, type User, type NewUser } from "../db/schema";
 
@@ -51,6 +51,27 @@ export function assignNodesToUser(db: Db, userId: string, nodeIds: string[]): vo
   for (const nodeId of nodeIds) {
     db.insert(userNodes).values({ user_id: userId, node_id: nodeId }).run();
   }
+}
+
+// 为用户添加单个节点（增量追加，已存在则忽略）
+export function addNodeToUser(db: Db, userId: string, nodeId: string): boolean {
+  const existing = db
+    .select()
+    .from(userNodes)
+    .where(and(eq(userNodes.user_id, userId), eq(userNodes.node_id, nodeId)))
+    .get();
+  if (existing) return false;
+  db.insert(userNodes).values({ user_id: userId, node_id: nodeId }).run();
+  return true;
+}
+
+// 为用户移除单个节点
+export function removeNodeFromUser(db: Db, userId: string, nodeId: string): boolean {
+  const result = db
+    .delete(userNodes)
+    .where(and(eq(userNodes.user_id, userId), eq(userNodes.node_id, nodeId)))
+    .run();
+  return result.changes > 0;
 }
 
 // 获取用户关联的节点列表

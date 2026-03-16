@@ -12,9 +12,11 @@ import {
   deleteUserWithSync,
   resetTrafficWithSync,
   assignNodesWithSync,
+  addNodeWithSync,
+  removeNodeWithSync,
 } from "../../services/user-ops";
 
-// 注册用户管理工具（7 个）：list_users, create_user, update_user, delete_user, reset_traffic, assign_nodes, list_user_nodes
+// 注册用户管理工具（9 个）：list_users, create_user, update_user, delete_user, reset_traffic, assign_nodes, add_user_node, remove_user_node, list_user_nodes
 export function register(server: McpServer, db: Db, _baseUrl: string) {
   server.registerTool(
     "list_users",
@@ -98,10 +100,10 @@ export function register(server: McpServer, db: Db, _baseUrl: string) {
   server.registerTool(
     "assign_nodes",
     {
-      description: "Assign nodes to a user (replaces existing assignments). Required for user to connect via those nodes.",
+      description: "Set the FULL list of nodes for a user (replaces ALL existing assignments). ⚠️ This is a REPLACE operation — any previously assigned nodes NOT in the list will be REMOVED. To add/remove a single node without affecting others, use add_user_node / remove_user_node instead.",
       inputSchema: {
         user_id: z.string().describe("User ID"),
-        node_ids: z.array(z.string()).describe("List of node IDs to assign"),
+        node_ids: z.array(z.string()).describe("Complete list of node IDs — replaces all current assignments"),
       },
     },
     async ({ user_id, node_ids }) => {
@@ -116,6 +118,62 @@ export function register(server: McpServer, db: Db, _baseUrl: string) {
       const assigned = getUserNodes(db, user_id);
       return {
         content: [{ type: "text", text: JSON.stringify({ user_id, nodes: assigned.map(n => ({ id: n.id, name: n.name })) }) }],
+      };
+    }
+  );
+
+  server.registerTool(
+    "add_user_node",
+    {
+      description: "Add a single node to a user's access list (incremental — does not affect other assigned nodes). Idempotent: returns success even if already assigned.",
+      inputSchema: {
+        user_id: z.string().describe("User ID"),
+        node_id: z.string().describe("Node ID to add"),
+      },
+    },
+    async ({ user_id, node_id }) => {
+      const user = getUser(db, user_id);
+      if (!user) {
+        return { isError: true, content: [{ type: "text", text: JSON.stringify({ error: "User not found" }) }] };
+      }
+      const { added, errors } = await addNodeWithSync(db, user_id, node_id);
+      const assigned = getUserNodes(db, user_id);
+      return {
+        content: [{ type: "text", text: JSON.stringify({
+          user_id,
+          node_id,
+          added,
+          total_nodes: assigned.length,
+          sync_errors: errors,
+        }) }],
+      };
+    }
+  );
+
+  server.registerTool(
+    "remove_user_node",
+    {
+      description: "Remove a single node from a user's access list (incremental — does not affect other assigned nodes).",
+      inputSchema: {
+        user_id: z.string().describe("User ID"),
+        node_id: z.string().describe("Node ID to remove"),
+      },
+    },
+    async ({ user_id, node_id }) => {
+      const user = getUser(db, user_id);
+      if (!user) {
+        return { isError: true, content: [{ type: "text", text: JSON.stringify({ error: "User not found" }) }] };
+      }
+      const { removed, errors } = await removeNodeWithSync(db, user_id, node_id);
+      const assigned = getUserNodes(db, user_id);
+      return {
+        content: [{ type: "text", text: JSON.stringify({
+          user_id,
+          node_id,
+          removed,
+          total_nodes: assigned.length,
+          sync_errors: errors,
+        }) }],
       };
     }
   );
