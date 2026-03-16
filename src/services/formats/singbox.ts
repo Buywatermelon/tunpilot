@@ -85,7 +85,7 @@ export const singbox: SubscriptionFormat = {
             tag: "geosite-cn",
             format: "binary",
             url: "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@sing/geo/geosite/cn.srs",
-            download_detour: "proxy",
+            download_detour: "direct",
             update_interval: "1d",
           },
           {
@@ -93,7 +93,7 @@ export const singbox: SubscriptionFormat = {
             tag: "geoip-cn",
             format: "binary",
             url: "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@sing/geo/geoip/cn.srs",
-            download_detour: "proxy",
+            download_detour: "direct",
             update_interval: "1d",
           },
           {
@@ -101,7 +101,7 @@ export const singbox: SubscriptionFormat = {
             tag: "geosite-category-ads-all",
             format: "binary",
             url: "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@sing/geo/geosite/category-ads-all.srs",
-            download_detour: "proxy",
+            download_detour: "direct",
             update_interval: "1d",
           },
         ],
