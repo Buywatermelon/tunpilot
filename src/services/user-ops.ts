@@ -14,6 +14,7 @@ import {
   syncUserToXrayNodes,
   syncTrojanNodes,
   getUserTrojanNodes,
+  type SyncError,
 } from "./xray/sync";
 
 /**
@@ -92,7 +93,7 @@ export async function addNodeWithSync(
   db: Db,
   userId: string,
   nodeId: string
-): Promise<{ added: boolean; errors: string[] }> {
+): Promise<{ added: boolean; errors: SyncError[] }> {
   const added = addNodeToUser(db, userId, nodeId);
   if (!added) return { added: false, errors: [] };
 
@@ -107,7 +108,7 @@ export async function removeNodeWithSync(
   db: Db,
   userId: string,
   nodeId: string
-): Promise<{ removed: boolean; errors: string[] }> {
+): Promise<{ removed: boolean; errors: SyncError[] }> {
   const removed = removeNodeFromUser(db, userId, nodeId);
   if (!removed) return { removed: false, errors: [] };
 

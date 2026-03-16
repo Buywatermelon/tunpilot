@@ -67,11 +67,12 @@ export function addNodeToUser(db: Db, userId: string, nodeId: string): boolean {
 
 // 为用户移除单个节点
 export function removeNodeFromUser(db: Db, userId: string, nodeId: string): boolean {
-  const result = db
+  const deleted = db
     .delete(userNodes)
     .where(and(eq(userNodes.user_id, userId), eq(userNodes.node_id, nodeId)))
-    .run();
-  return result.changes > 0;
+    .returning()
+    .all();
+  return deleted.length > 0;
 }
 
 // 获取用户关联的节点列表
