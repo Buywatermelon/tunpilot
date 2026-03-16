@@ -13,9 +13,6 @@ export const singbox: SubscriptionFormat = {
         enabled: true,
         server_name: n.sni || n.host,
       };
-      if (n.cert_fingerprint && n.protocol === "trojan") {
-        tls.certificate_public_key_sha256 = [n.cert_fingerprint];
-      }
       if (n.insecure) {
         tls.insecure = true;
       }
