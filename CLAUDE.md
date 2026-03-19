@@ -36,3 +36,7 @@ bun run db:push   # 同步 Drizzle schema 到 SQLite
 - **routing_rules 表**：动态绑定，key→action 映射，支持 strict 模式（宁断不降）
 - **上游源**：sing-box 用 MetaCubeX .srs，Clash/Surge 用 blackmatrix7 远程规则
 - **MCP 工具**：list_rule_sets / list_routing_rules / set_routing_rule / remove_routing_rule
+
+## 设置系统
+
+`settings` 表存储 API key 等配置项，值脱敏展示。MCP 工具：set_setting / list_settings / delete_setting
