@@ -4,6 +4,7 @@ import { authenticate } from "../services/auth";
 import { getUser, getUserNodes } from "../services/user";
 import { getSubscriptionByToken } from "../services/subscription";
 import { getFormat } from "../services/formats/index";
+import { getActiveRules, getAllNodes } from "../services/routing/index";
 
 export function createHttpApp(db: Db, baseUrl: string): Hono {
   const app = new Hono();
@@ -41,7 +42,9 @@ export function createHttpApp(db: Db, baseUrl: string): Hono {
 
     const nodes = getUserNodes(db, user.id).filter((n) => n.enabled);
     const subscriptionUrl = `${baseUrl}/sub/${token}`;
-    const content = format.render(user, nodes, { subscriptionUrl });
+    const routingRules = getActiveRules(db);
+    const allNodes = getAllNodes(db);
+    const content = format.render(user, nodes, { subscriptionUrl, routingRules, allNodes });
 
     return new Response(content, {
       headers: { "Content-Type": format.contentType },

@@ -79,6 +79,20 @@ export const settings = sqliteTable("settings", {
 
 export type Setting = typeof settings.$inferSelect;
 
+// 分流规则表
+export const routingRules = sqliteTable("routing_rules", {
+  id: text("id").primaryKey(),
+  rule_set_key: text("rule_set_key").notNull(),
+  action: text("action").notNull(),
+  strict: integer("strict").default(0),
+  priority: integer("priority").default(0),
+  enabled: integer("enabled").default(1),
+  created_at: text("created_at").default(sql`(datetime('now'))`),
+});
+
+export type RoutingRule = typeof routingRules.$inferSelect;
+export type NewRoutingRule = typeof routingRules.$inferInsert;
+
 // 从 schema 推导的类型
 export type Node = typeof nodes.$inferSelect;
 export type NewNode = typeof nodes.$inferInsert;

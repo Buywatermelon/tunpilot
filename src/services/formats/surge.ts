@@ -1,5 +1,7 @@
 import type { User, Node } from "../../db/schema";
 import type { SubscriptionFormat, RenderMeta } from "./index";
+import { RULE_SET_CATALOG } from "../routing/catalog";
+import { resolveAllRules } from "../routing/resolve";
 
 function renderProxyLine(node: Node, password: string): string {
   const sni = node.sni || node.host;
@@ -24,6 +26,10 @@ export const surge: SubscriptionFormat = {
   name: "surge",
   contentType: "text/plain; charset=utf-8",
   render(user: User, nodes: Node[], meta?: RenderMeta): string {
+    const routingRules = meta?.routingRules ?? [];
+    const allNodes = meta?.allNodes ?? nodes;
+    const resolved = resolveAllRules(routingRules, nodes, allNodes);
+
     const lines: string[] = [];
 
     // Managed config header
@@ -53,12 +59,46 @@ export const surge: SubscriptionFormat = {
     lines.push(`Auto = url-test, ${nodeNames.join(", ")}, url=http://www.gstatic.com/generate_204, interval=300, tolerance=50`);
     lines.push("");
 
-    // [Rule]
+    // [Rule] — 动态生成
     lines.push("[Rule]");
-    lines.push("GEOIP,CN,DIRECT");
-    lines.push("FINAL,Proxy");
-    lines.push("");
 
+    for (const { rule, outbound } of resolved) {
+      const catalog = RULE_SET_CATALOG[rule.rule_set_key];
+      if (!catalog) continue;
+
+      const surgeOutbound = outbound === "direct"
+        ? "DIRECT"
+        : outbound === "reject"
+          ? "REJECT"
+          : outbound === "proxy"
+            ? "Proxy"
+            : outbound;
+
+      // 兜底
+      if ("type" in catalog.singbox && catalog.singbox.type === "final") {
+        lines.push(`FINAL,${surgeOutbound}`);
+        continue;
+      }
+
+      // 私有地址
+      if (rule.rule_set_key === "private") {
+        lines.push(`GEOIP,LAN,${surgeOutbound},no-resolve`);
+        continue;
+      }
+
+      if (!catalog.surge) continue;
+
+      for (const ruleTemplate of catalog.surge.rules) {
+        lines.push(ruleTemplate.replace("{outbound}", surgeOutbound));
+      }
+    }
+
+    // 确保有兜底
+    if (!lines.some((l) => l.startsWith("FINAL,"))) {
+      lines.push("FINAL,Proxy");
+    }
+
+    lines.push("");
     return lines.join("\n");
   },
 };

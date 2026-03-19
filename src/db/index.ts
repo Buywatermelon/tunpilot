@@ -90,6 +90,26 @@ export function initDatabase(path: string): Db {
     )
   `);
 
+  sqlite.run(`
+    CREATE TABLE IF NOT EXISTS routing_rules (
+      id            TEXT PRIMARY KEY,
+      rule_set_key  TEXT NOT NULL,
+      action        TEXT NOT NULL,
+      strict        INTEGER DEFAULT 0,
+      priority      INTEGER DEFAULT 0,
+      enabled       INTEGER DEFAULT 1,
+      created_at    TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  // 默认分流规则
+  sqlite.run(`INSERT OR IGNORE INTO routing_rules (id, rule_set_key, action, priority) VALUES
+    ('private-direct', 'private', 'direct', 100),
+    ('ads-reject', 'ads', 'reject', 90),
+    ('cn-direct', 'cn', 'direct', 80),
+    ('catch-all', 'match', 'proxy', 0)
+  `);
+
   // 索引
   sqlite.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_password ON users(password)`);
   sqlite.run(`CREATE INDEX IF NOT EXISTS idx_traffic_logs_recorded_at ON traffic_logs(recorded_at)`);

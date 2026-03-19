@@ -1,12 +1,21 @@
 import type { User, Node } from "../../db/schema";
 import type { SubscriptionFormat, RenderMeta } from "./index";
+import {
+  RULE_SET_CATALOG,
+  type SingboxRemote,
+  type SingboxInline,
+} from "../routing/catalog";
+import { resolveAllRules } from "../routing/resolve";
 
 export const singbox: SubscriptionFormat = {
   name: "singbox",
   contentType: "application/json",
 
-  render(user: User, nodes: Node[], _meta?: RenderMeta): string {
+  render(user: User, nodes: Node[], meta?: RenderMeta): string {
     const nodeNames = nodes.map((n) => n.name);
+    const routingRules = meta?.routingRules ?? [];
+    const allNodes = meta?.allNodes ?? nodes;
+    const resolved = resolveAllRules(routingRules, nodes, allNodes);
 
     const proxyOutbounds = nodes.map((n) => {
       const tls: Record<string, unknown> = {
@@ -22,6 +31,76 @@ export const singbox: SubscriptionFormat = {
       return { type: "hysteria2" as const, tag: n.name, server: n.host, server_port: n.port, password: user.password, tls };
     });
 
+    // 动态构建 route.rules 和 route.rule_set
+    const routeRules: Record<string, unknown>[] = [
+      { action: "sniff" },
+      { protocol: "dns", action: "hijack-dns" },
+    ];
+    const ruleSetDefs: Record<string, unknown>[] = [];
+    const ruleSetTags = new Set<string>();
+
+    // 收集需要用于 DNS 分流的 CN geosite tag
+    let cnGeositeTags: string[] = [];
+
+    for (const { rule, outbound } of resolved) {
+      const catalog = RULE_SET_CATALOG[rule.rule_set_key];
+      if (!catalog) continue;
+
+      const def = catalog.singbox;
+
+      if ("type" in def && def.type === "final") {
+        // 兜底规则由 route.final 处理
+        continue;
+      }
+
+      if ("type" in def && def.type === "inline") {
+        const inlineDef = def as SingboxInline;
+        const entry: Record<string, unknown> = { ...inlineDef.rule };
+        if (outbound === "reject") {
+          entry.action = "reject";
+        } else {
+          entry.outbound = outbound;
+        }
+        routeRules.push(entry);
+        continue;
+      }
+
+      // 远程 rule_set
+      const remoteDef = def as SingboxRemote;
+      const tags = remoteDef.ruleSets.map((rs) => rs.tag);
+
+      // 注册 rule_set 定义（去重）
+      for (const rs of remoteDef.ruleSets) {
+        if (!ruleSetTags.has(rs.tag)) {
+          ruleSetTags.add(rs.tag);
+          ruleSetDefs.push({
+            type: "remote",
+            tag: rs.tag,
+            format: "binary",
+            url: rs.url,
+            download_detour: "direct",
+            update_interval: "1d",
+          });
+        }
+      }
+
+      // 记录 CN geosite 用于 DNS 分流
+      if (rule.rule_set_key === "cn") {
+        cnGeositeTags = remoteDef.ruleSets
+          .filter((rs) => rs.type === "geosite")
+          .map((rs) => rs.tag);
+      }
+
+      // 生成 route rule
+      const entry: Record<string, unknown> = { rule_set: tags };
+      if (outbound === "reject") {
+        entry.action = "reject";
+      } else {
+        entry.outbound = outbound;
+      }
+      routeRules.push(entry);
+    }
+
     const config = {
       log: { level: "info", timestamp: true },
       dns: {
@@ -29,9 +108,9 @@ export const singbox: SubscriptionFormat = {
           { type: "https", tag: "dns-remote", server: "dns.google", server_port: 443, path: "/dns-query", domain_resolver: "dns-direct" },
           { type: "udp", tag: "dns-direct", server: "223.5.5.5", server_port: 53, detour: "direct" },
         ],
-        rules: [
-          { rule_set: "geosite-cn", server: "dns-direct" },
-        ],
+        rules: cnGeositeTags.length > 0
+          ? [{ rule_set: cnGeositeTags, server: "dns-direct" }]
+          : [],
         final: "dns-remote",
         strategy: "prefer_ipv4",
         independent_cache: true,
@@ -70,39 +149,8 @@ export const singbox: SubscriptionFormat = {
         { type: "direct", tag: "direct" },
       ],
       route: {
-        rules: [
-          { action: "sniff" },
-          { protocol: "dns", action: "hijack-dns" },
-          { ip_is_private: true, outbound: "direct" },
-          { rule_set: ["geosite-cn", "geoip-cn"], outbound: "direct" },
-          { rule_set: ["geosite-category-ads-all"], action: "reject" },
-        ],
-        rule_set: [
-          {
-            type: "remote",
-            tag: "geosite-cn",
-            format: "binary",
-            url: "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@sing/geo/geosite/cn.srs",
-            download_detour: "direct",
-            update_interval: "1d",
-          },
-          {
-            type: "remote",
-            tag: "geoip-cn",
-            format: "binary",
-            url: "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@sing/geo/geoip/cn.srs",
-            download_detour: "direct",
-            update_interval: "1d",
-          },
-          {
-            type: "remote",
-            tag: "geosite-category-ads-all",
-            format: "binary",
-            url: "https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@sing/geo/geosite/category-ads-all.srs",
-            download_detour: "direct",
-            update_interval: "1d",
-          },
-        ],
+        rules: routeRules,
+        rule_set: ruleSetDefs,
         auto_detect_interface: true,
         default_domain_resolver: "dns-direct",
         final: "proxy",

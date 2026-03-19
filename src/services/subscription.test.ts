@@ -206,8 +206,8 @@ describe("订阅服务", () => {
       const { user, nodes } = setupUserWithNodes();
       const yaml = format.render(user, nodes);
       expect(yaml).toContain("proxy-groups:");
-      expect(yaml).toContain("- BWG-US");
-      expect(yaml).toContain("- IIJ-JP");
+      expect(yaml).toContain('"BWG-US"');
+      expect(yaml).toContain('"IIJ-JP"');
     });
 
     test("包含路由规则", () => {
@@ -276,7 +276,6 @@ describe("订阅服务", () => {
       const conf = format.render(user, nodes);
       expect(conf).toContain("Proxy = select");
       expect(conf).toContain("Auto = url-test");
-      expect(conf).toContain("GEOIP,CN,DIRECT");
       expect(conf).toContain("FINAL,Proxy");
     });
   });
