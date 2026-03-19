@@ -121,33 +121,16 @@ describe("订阅服务", () => {
 
   // --- renderShadowrocket (via Format Registry) ---
 
-  describe("渲染 Shadowrocket 配置", () => {
+  describe("Shadowrocket 别名返回 Surge 配置", () => {
     const format = getFormat("shadowrocket")!;
 
-    test("生成 Base64 编码的 hysteria2 URI", () => {
+    test("shadowrocket 格式已注册且返回 Surge 内容", () => {
+      expect(format).toBeDefined();
       const { user, nodes } = setupUserWithNodes();
       const result = format.render(user, nodes);
-      const decoded = atob(result);
-      const lines = decoded.trim().split("\n");
-      expect(lines).toHaveLength(2);
-      expect(lines[0]).toContain("hysteria2://secret123@us-node.example.com:443");
-      expect(lines[0]).toContain("sni=us-node.example.com");
-      expect(lines[0]).toContain("#BWG-US");
-      expect(lines[1]).toContain("hysteria2://secret123@jp-node.example.com:443");
-      expect(lines[1]).toContain("#IIJ-JP");
-    });
-
-    test("sni 为空时使用 host 作为 fallback", () => {
-      const user = createUser(db, { name: "bob", password: "pass" });
-      const node = addNode(db, {
-        name: "HK-Node",
-        host: "1.2.3.4",
-        port: 8443,
-        protocol: "hysteria2",
-      });
-      const result = format.render(user, [node]);
-      const decoded = atob(result);
-      expect(decoded).toContain("sni=1.2.3.4");
+      expect(result).toContain("[Proxy]");
+      expect(result).toContain("[Rule]");
+      expect(result).toContain("BWG-US");
     });
   });
 
@@ -298,14 +281,14 @@ describe("订阅服务", () => {
   // --- getSubscriptionConfig ---
 
   describe("获取订阅配置", () => {
-    test("返回 Shadowrocket 配置（text/plain 类型）", () => {
+    test("返回 Shadowrocket 配置（Surge 别名，text/plain 类型）", () => {
       const { user } = setupUserWithNodes();
       const sub = generateSubscription(db, user.id, "shadowrocket");
       const result = getSubscriptionConfig(db, sub.token);
       expect(result).not.toBeNull();
       expect(result!.contentType).toBe("text/plain; charset=utf-8");
-      // 内容应为有效的 Base64
-      expect(() => atob(result!.content)).not.toThrow();
+      expect(result!.content).toContain("[Proxy]");
+      expect(result!.content).toContain("[Rule]");
     });
 
     test("返回 Sing-box 配置（application/json 类型）", () => {
@@ -350,9 +333,8 @@ describe("订阅服务", () => {
       assignNodesToUser(db, user.id, [n1.id, n2.id]);
       const sub = generateSubscription(db, user.id, "shadowrocket");
       const result = getSubscriptionConfig(db, sub.token);
-      const decoded = atob(result!.content);
-      expect(decoded).toContain("Enabled-Node");
-      expect(decoded).not.toContain("Disabled-Node");
+      expect(result!.content).toContain("Enabled-Node");
+      expect(result!.content).not.toContain("Disabled-Node");
     });
   });
 });

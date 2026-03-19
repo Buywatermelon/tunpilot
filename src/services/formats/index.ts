@@ -32,12 +32,12 @@ export function getAllFormatNames(): string[] {
 
 // --- 自动注册所有格式 ---
 
-import { shadowrocket } from "./shadowrocket";
 import { singbox } from "./singbox";
 import { clash } from "./clash";
 import { surge } from "./surge";
 
-registerFormat(shadowrocket);
 registerFormat(singbox);
 registerFormat(clash);
 registerFormat(surge);
+// shadowrocket → surge 别名（小火箭完全兼容 Surge 配置）
+registry.set("shadowrocket", surge);

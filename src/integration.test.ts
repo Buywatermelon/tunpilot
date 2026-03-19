@@ -171,15 +171,14 @@ describe("integration: subscription flow", () => {
     const sbSub = generateSubscription(db, user.id, "singbox");
     const clSub = generateSubscription(db, user.id, "clash");
 
-    // Shadowrocket: base64 encoded URIs
+    // Shadowrocket (Surge alias): Surge config with [Proxy] and [Rule]
     const srRes = await req(`/sub/${srSub.token}`);
     expect(srRes.status).toBe(200);
     const srText = await srRes.text();
-    const decoded = atob(srText);
-    expect(decoded).toContain("hysteria2://");
-    expect(decoded).toContain("mypassword");
-    expect(decoded).toContain("US%20West");
-    expect(decoded).toContain("JP%20Tokyo");
+    expect(srText).toContain("[Proxy]");
+    expect(srText).toContain("mypassword");
+    expect(srText).toContain("US West");
+    expect(srText).toContain("JP Tokyo");
 
     // Sing-box: JSON config with outbounds
     const sbRes = await req(`/sub/${sbSub.token}`);

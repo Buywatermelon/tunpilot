@@ -173,15 +173,15 @@ describe("GET /sub/:token", () => {
     return { node, user, sub };
   }
 
-  test("shadowrocket returns base64 text/plain", async () => {
+  test("shadowrocket returns surge config (alias)", async () => {
     const { sub } = setupUserWithSub("shadowrocket");
     const res = await req(`/sub/${sub.token}`);
 
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("text/plain");
     const text = await res.text();
-    // Should be valid base64
-    expect(() => atob(text)).not.toThrow();
+    expect(text).toContain("[Proxy]");
+    expect(text).toContain("[Rule]");
   });
 
   test("singbox returns application/json", async () => {
