@@ -66,10 +66,23 @@ export const surge: SubscriptionFormat = {
       lines.push("");
     }
 
+    // 从自定义 DIRECT 规则中提取域名，用于 skip-proxy 和 always-real-ip
+    const customRules = meta?.customRules ?? [];
+    const directDomains: string[] = [];
+    for (const r of customRules) {
+      if (r.action !== "direct") continue;
+      if (r.type === "domain") directDomains.push(r.value);
+      else if (r.type === "domain_suffix") directDomains.push(`*.${r.value}`, r.value);
+    }
+
     // [General]
     lines.push("[General]");
     lines.push("loglevel = notify");
-    lines.push("skip-proxy = 127.0.0.1, 192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12, 100.64.0.0/10, localhost, *.local");
+    const skipProxy = ["127.0.0.1", "192.168.0.0/16", "10.0.0.0/8", "172.16.0.0/12", "100.64.0.0/10", "localhost", "*.local", ...directDomains];
+    lines.push(`skip-proxy = ${skipProxy.join(", ")}`);
+    if (directDomains.length > 0) {
+      lines.push(`always-real-ip = ${directDomains.join(", ")}`);
+    }
     lines.push("");
 
     // [Proxy]
@@ -91,7 +104,6 @@ export const surge: SubscriptionFormat = {
     lines.push("[Rule]");
 
     // 自定义域名/IP 规则（优先级最高，排在分类规则之前）
-    const customRules = meta?.customRules ?? [];
     if (customRules.length > 0) {
       lines.push(...renderCustomRules(customRules));
     }
