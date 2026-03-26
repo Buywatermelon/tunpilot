@@ -1,10 +1,7 @@
 import { Hono } from "hono";
 import type { Db } from "../db/index";
 import { authenticate } from "../services/auth";
-import { getUser, getUserNodes } from "../services/user";
-import { getSubscriptionByToken } from "../services/subscription";
-import { getFormat } from "../services/formats/index";
-import { getActiveRules, getAllNodes } from "../services/routing/index";
+import { getSubscriptionConfig } from "../services/subscription";
 
 export function createHttpApp(db: Db, baseUrl: string): Hono {
   const app = new Hono();
@@ -31,23 +28,11 @@ export function createHttpApp(db: Db, baseUrl: string): Hono {
   // 订阅链接下载
   app.get("/sub/:token", (c) => {
     const { token } = c.req.param();
-    const sub = getSubscriptionByToken(db, token);
-    if (!sub) return c.notFound();
+    const config = getSubscriptionConfig(db, token, baseUrl);
+    if (!config) return c.notFound();
 
-    const format = getFormat(sub.format);
-    if (!format) return c.notFound();
-
-    const user = getUser(db, sub.user_id);
-    if (!user) return c.notFound();
-
-    const nodes = getUserNodes(db, user.id).filter((n) => n.enabled);
-    const subscriptionUrl = `${baseUrl}/sub/${token}`;
-    const routingRules = getActiveRules(db);
-    const allNodes = getAllNodes(db);
-    const content = format.render(user, nodes, { subscriptionUrl, routingRules, allNodes });
-
-    return new Response(content, {
-      headers: { "Content-Type": format.contentType },
+    return new Response(config.content, {
+      headers: { "Content-Type": config.contentType },
     });
   });
 
