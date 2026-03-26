@@ -5,6 +5,7 @@ import {
   listCustomRules,
   addCustomRule,
   removeCustomRule,
+  updateCustomRule,
 } from "../../services/routing/custom-rules";
 
 // 注册自定义分流规则工具（3 个）
@@ -121,6 +122,48 @@ export function register(server: McpServer, db: Db) {
             {
               type: "text" as const,
               text: `Custom rule "${id}" removed.`,
+            },
+          ],
+        };
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        return {
+          content: [{ type: "text" as const, text: `Error: ${msg}` }],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  server.registerTool(
+    "update_custom_rule",
+    {
+      description:
+        'Update a custom routing rule. Use list_custom_rules to find the ID. Any field can be updated independently.',
+      inputSchema: {
+        id: z.string().describe("The ID of the custom rule to update."),
+        type: z
+          .enum(["domain", "domain_suffix", "domain_keyword", "ip_cidr"])
+          .optional()
+          .describe("New match type."),
+        value: z.string().optional().describe("New domain, keyword, or IP CIDR value."),
+        action: z
+          .enum(["direct", "reject", "proxy"])
+          .optional()
+          .describe("New action."),
+        priority: z.number().optional().describe("New priority."),
+        enabled: z.boolean().optional().describe("Enable or disable the rule."),
+        description: z.string().optional().describe("New description."),
+      },
+    },
+    async ({ id, type, value, action, priority, enabled, description }) => {
+      try {
+        const rule = updateCustomRule(db, id, { type, value, action, priority, enabled, description });
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Custom rule updated: ${rule.type.toUpperCase()} ${rule.value} → ${rule.action} (enabled: ${rule.enabled === 1}, priority: ${rule.priority})\nID: ${rule.id}`,
             },
           ],
         };

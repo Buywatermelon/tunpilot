@@ -22,6 +22,15 @@ export function deleteSetting(db: Db, key: string): void {
   db.delete(settings).where(eq(settings.key, key)).run();
 }
 
+export function getAllSettings(db: Db): Record<string, string> {
+  const rows = db.select().from(settings).all();
+  const result: Record<string, string> = {};
+  for (const row of rows) {
+    result[row.key] = row.value;
+  }
+  return result;
+}
+
 export function listSettings(db: Db): Array<{ key: string; masked_value: string; updated_at: string | null }> {
   const rows = db.select().from(settings).all();
   return rows.map(row => ({

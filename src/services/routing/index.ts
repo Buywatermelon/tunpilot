@@ -1,6 +1,6 @@
 // 分流规则 CRUD service 函数
 
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import type { Db } from "../../db/index";
 import { routingRules, nodes, type RoutingRule } from "../../db/schema";
 import { RULE_SET_CATALOG } from "./catalog";
@@ -10,6 +10,8 @@ export {
   listCustomRules,
   addCustomRule,
   removeCustomRule,
+  getCustomRule,
+  updateCustomRule,
 } from "./custom-rules";
 
 /** 获取所有生效的规则（按 priority DESC） */
@@ -18,8 +20,8 @@ export function getActiveRules(db: Db): RoutingRule[] {
     .select()
     .from(routingRules)
     .where(eq(routingRules.enabled, 1))
-    .all()
-    .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+    .orderBy(desc(routingRules.priority))
+    .all();
 }
 
 /** 列出所有规则（含禁用的） */
@@ -27,8 +29,8 @@ export function listRoutingRules(db: Db): RoutingRule[] {
   return db
     .select()
     .from(routingRules)
-    .all()
-    .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+    .orderBy(desc(routingRules.priority))
+    .all();
 }
 
 /** 设置/更新一条规则 */

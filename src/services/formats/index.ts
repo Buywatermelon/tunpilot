@@ -7,6 +7,7 @@ export interface RenderMeta {
   routingRules?: RoutingRule[];
   customRules?: CustomRule[];
   allNodes?: Node[];
+  settings?: Record<string, string>;
 }
 
 export interface SubscriptionFormat {

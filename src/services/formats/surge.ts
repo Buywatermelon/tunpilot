@@ -2,34 +2,7 @@ import type { User, Node } from "../../db/schema";
 import type { SubscriptionFormat, RenderMeta } from "./index";
 import { RULE_SET_CATALOG } from "../routing/catalog";
 import { resolveAllRules } from "../routing/resolve";
-import type { CustomRule } from "../../db/schema";
-
-// 将自定义规则转为 Surge 规则行
-function renderCustomRules(rules: CustomRule[]): string[] {
-  const lines: string[] = [];
-  for (const rule of rules) {
-    const outbound = rule.action === "direct"
-      ? "DIRECT"
-      : rule.action === "reject"
-        ? "REJECT"
-        : "Proxy";
-    switch (rule.type) {
-      case "domain":
-        lines.push(`DOMAIN,${rule.value},${outbound}`);
-        break;
-      case "domain_suffix":
-        lines.push(`DOMAIN-SUFFIX,${rule.value},${outbound}`);
-        break;
-      case "domain_keyword":
-        lines.push(`DOMAIN-KEYWORD,${rule.value},${outbound}`);
-        break;
-      case "ip_cidr":
-        lines.push(`IP-CIDR,${rule.value},${outbound},no-resolve`);
-        break;
-    }
-  }
-  return lines;
-}
+import { renderSurgeStyleRules } from "./custom-rule-utils";
 
 function renderProxyLine(node: Node, password: string): string {
   const sni = node.sni || node.host;
@@ -75,6 +48,8 @@ export const surge: SubscriptionFormat = {
       else if (r.type === "domain_suffix") directDomains.push(`*.${r.value}`, r.value);
     }
 
+    const s = meta?.settings ?? {};
+
     // [General]
     lines.push("[General]");
     lines.push("loglevel = notify");
@@ -83,16 +58,23 @@ export const surge: SubscriptionFormat = {
     if (directDomains.length > 0) {
       lines.push(`always-real-ip = ${directDomains.join(", ")}`);
     }
-    // Tailscale 100.x.x.x 网段不走 TUN，避免双 TUN 路由冲突
-    lines.push("tun-excluded-routes = 100.64.0.0/10");
-    // 显式指定 DNS，避免被 Tailscale MagicDNS (100.100.100.100) 劫持
-    lines.push("dns-server = 1.1.1.1, 8.8.8.8");
+    if (s.surge_tun_excluded_routes) {
+      lines.push(`tun-excluded-routes = ${s.surge_tun_excluded_routes}`);
+    }
+    if (s.surge_dns_servers) {
+      lines.push(`dns-server = ${s.surge_dns_servers}`);
+    }
     lines.push("");
 
-    // [Host] — .ts.net 走 Tailscale MagicDNS，支持设备名解析
-    lines.push("[Host]");
-    lines.push("*.ts.net = server:100.100.100.100");
-    lines.push("");
+    // [Host] — 从 settings 读取自定义 DNS 分流（如 Tailscale MagicDNS）
+    if (s.surge_host_rules) {
+      lines.push("[Host]");
+      for (const line of s.surge_host_rules.split("\n")) {
+        const trimmed = line.trim();
+        if (trimmed) lines.push(trimmed);
+      }
+      lines.push("");
+    }
 
     // [Proxy]
     lines.push("[Proxy]");
@@ -114,7 +96,7 @@ export const surge: SubscriptionFormat = {
 
     // 自定义域名/IP 规则（优先级最高，排在分类规则之前）
     if (customRules.length > 0) {
-      lines.push(...renderCustomRules(customRules));
+      lines.push(...renderSurgeStyleRules(customRules));
     }
 
     for (const { rule, outbound } of resolved) {

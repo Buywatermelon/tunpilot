@@ -5,6 +5,8 @@ import {
   listCustomRules,
   getActiveCustomRules,
   removeCustomRule,
+  getCustomRule,
+  updateCustomRule,
 } from "./custom-rules";
 
 let db: Db;
@@ -140,6 +142,71 @@ describe("removeCustomRule", () => {
 
   test("删除不存在的规则抛出错误", () => {
     expect(() => removeCustomRule(db, "nonexistent")).toThrow("not found");
+  });
+});
+
+describe("getCustomRule", () => {
+  test("返回指定 ID 的规则", () => {
+    const rule = addCustomRule(db, { type: "domain", value: "test.com", action: "direct" });
+    const found = getCustomRule(db, rule.id);
+    expect(found).not.toBeNull();
+    expect(found!.value).toBe("test.com");
+  });
+
+  test("不存在时返回 null", () => {
+    expect(getCustomRule(db, "nonexistent")).toBeNull();
+  });
+});
+
+describe("updateCustomRule", () => {
+  test("更新 action", () => {
+    const rule = addCustomRule(db, { type: "domain", value: "test.com", action: "direct" });
+    const updated = updateCustomRule(db, rule.id, { action: "proxy" });
+    expect(updated.action).toBe("proxy");
+  });
+
+  test("更新 priority 和 enabled", () => {
+    const rule = addCustomRule(db, { type: "domain", value: "test.com", action: "direct" });
+    const updated = updateCustomRule(db, rule.id, { priority: 50, enabled: false });
+    expect(updated.priority).toBe(50);
+    expect(updated.enabled).toBe(0);
+  });
+
+  test("更新 value 自动规范化", () => {
+    const rule = addCustomRule(db, { type: "domain", value: "test.com", action: "direct" });
+    const updated = updateCustomRule(db, rule.id, { value: "  NEW.COM  " });
+    expect(updated.value).toBe("new.com");
+  });
+
+  test("更新不存在的规则抛出错误", () => {
+    expect(() => updateCustomRule(db, "nonexistent", { action: "proxy" })).toThrow("not found");
+  });
+
+  test("无效 type 抛出错误", () => {
+    const rule = addCustomRule(db, { type: "domain", value: "test.com", action: "direct" });
+    expect(() => updateCustomRule(db, rule.id, { type: "bad" })).toThrow("Invalid type");
+  });
+
+  test("更新导致重复时抛出错误", () => {
+    addCustomRule(db, { type: "domain", value: "a.com", action: "direct" });
+    const rule2 = addCustomRule(db, { type: "domain", value: "b.com", action: "proxy" });
+    expect(() => updateCustomRule(db, rule2.id, { value: "a.com" })).toThrow("Duplicate");
+  });
+});
+
+describe("重复检测", () => {
+  test("添加相同 type+value 抛出错误", () => {
+    addCustomRule(db, { type: "domain_suffix", value: "test.com", action: "direct" });
+    expect(() =>
+      addCustomRule(db, { type: "domain_suffix", value: "test.com", action: "proxy" }),
+    ).toThrow("Duplicate");
+  });
+
+  test("不同 type 相同 value 允许", () => {
+    addCustomRule(db, { type: "domain", value: "test.com", action: "direct" });
+    expect(() =>
+      addCustomRule(db, { type: "domain_suffix", value: "test.com", action: "proxy" }),
+    ).not.toThrow();
   });
 });
 
