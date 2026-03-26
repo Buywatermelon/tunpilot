@@ -60,7 +60,7 @@ export const clash: SubscriptionFormat = {
           ? "REJECT"
           : outbound === "proxy"
             ? "Proxy"
-            : `"${outbound}"`;
+            : outbound;
 
       if (!catalog.clash) continue;
 
