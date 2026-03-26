@@ -1,10 +1,11 @@
-import type { User, Node, RoutingRule } from "../../db/schema";
+import type { User, Node, RoutingRule, CustomRule } from "../../db/schema";
 
 // --- 接口定义 ---
 
 export interface RenderMeta {
   subscriptionUrl?: string;
   routingRules?: RoutingRule[];
+  customRules?: CustomRule[];
   allNodes?: Node[];
 }
 

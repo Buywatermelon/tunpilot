@@ -6,6 +6,59 @@ import {
   type SingboxInline,
 } from "../routing/catalog";
 import { resolveAllRules } from "../routing/resolve";
+import type { CustomRule } from "../../db/schema";
+
+// 将自定义规则转为 sing-box route rule 对象
+function renderCustomRules(rules: CustomRule[]): Record<string, unknown>[] {
+  // 按 action 分组，合并同 action 的规则为一条 sing-box route rule
+  const grouped = new Map<string, CustomRule[]>();
+  for (const rule of rules) {
+    const list = grouped.get(rule.action) ?? [];
+    list.push(rule);
+    grouped.set(rule.action, list);
+  }
+
+  const result: Record<string, unknown>[] = [];
+  for (const [action, group] of grouped) {
+    const entry: Record<string, unknown> = {};
+    const domains: string[] = [];
+    const domainSuffixes: string[] = [];
+    const domainKeywords: string[] = [];
+    const ipCidrs: string[] = [];
+
+    for (const rule of group) {
+      switch (rule.type) {
+        case "domain":
+          domains.push(rule.value);
+          break;
+        case "domain_suffix":
+          domainSuffixes.push(rule.value);
+          break;
+        case "domain_keyword":
+          domainKeywords.push(rule.value);
+          break;
+        case "ip_cidr":
+          ipCidrs.push(rule.value);
+          break;
+      }
+    }
+
+    if (domains.length > 0) entry.domain = domains;
+    if (domainSuffixes.length > 0) entry.domain_suffix = domainSuffixes;
+    if (domainKeywords.length > 0) entry.domain_keyword = domainKeywords;
+    if (ipCidrs.length > 0) entry.ip_cidr = ipCidrs;
+
+    if (action === "reject") {
+      entry.action = "reject";
+    } else {
+      entry.outbound = action;
+    }
+
+    result.push(entry);
+  }
+
+  return result;
+}
 
 export const singbox: SubscriptionFormat = {
   name: "singbox",
@@ -41,6 +94,12 @@ export const singbox: SubscriptionFormat = {
 
     // 收集需要用于 DNS 分流的 CN geosite tag
     let cnGeositeTags: string[] = [];
+
+    // 自定义域名/IP 规则（优先级最高，排在分类规则之前）
+    const customRulesList = meta?.customRules ?? [];
+    if (customRulesList.length > 0) {
+      routeRules.push(...renderCustomRules(customRulesList));
+    }
 
     for (const { rule, outbound } of resolved) {
       const catalog = RULE_SET_CATALOG[rule.rule_set_key];

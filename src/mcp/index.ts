@@ -6,6 +6,7 @@ import { register as registerSubscriptions } from "./tools/subscriptions";
 import { register as registerMonitoring } from "./tools/monitoring";
 import { register as registerSettings } from "./tools/settings";
 import { register as registerRouting } from "./tools/routing";
+import { register as registerCustomRules } from "./tools/custom-rules";
 
 // 创建 MCP 服务器并注册所有工具组（共 24 个工具）
 export function createMcpServer(db: Db, baseUrl: string): McpServer {
@@ -20,6 +21,7 @@ export function createMcpServer(db: Db, baseUrl: string): McpServer {
   registerMonitoring(server, db, baseUrl);
   registerSettings(server, db, baseUrl);
   registerRouting(server, db);
+  registerCustomRules(server, db);
 
   return server;
 }

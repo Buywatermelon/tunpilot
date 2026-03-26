@@ -5,6 +5,13 @@ import type { Db } from "../../db/index";
 import { routingRules, nodes, type RoutingRule } from "../../db/schema";
 import { RULE_SET_CATALOG } from "./catalog";
 
+export {
+  getActiveCustomRules,
+  listCustomRules,
+  addCustomRule,
+  removeCustomRule,
+} from "./custom-rules";
+
 /** 获取所有生效的规则（按 priority DESC） */
 export function getActiveRules(db: Db): RoutingRule[] {
   return db

@@ -102,6 +102,19 @@ export function initDatabase(path: string): Db {
     )
   `);
 
+  sqlite.run(`
+    CREATE TABLE IF NOT EXISTS custom_rules (
+      id            TEXT PRIMARY KEY,
+      type          TEXT NOT NULL,
+      value         TEXT NOT NULL,
+      action        TEXT NOT NULL,
+      priority      INTEGER DEFAULT 100,
+      enabled       INTEGER DEFAULT 1,
+      description   TEXT,
+      created_at    TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
   // 默认分流规则
   sqlite.run(`INSERT OR IGNORE INTO routing_rules (id, rule_set_key, action, priority) VALUES
     ('private-direct', 'private', 'direct', 100),

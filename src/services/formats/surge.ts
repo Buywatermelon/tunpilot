@@ -2,6 +2,34 @@ import type { User, Node } from "../../db/schema";
 import type { SubscriptionFormat, RenderMeta } from "./index";
 import { RULE_SET_CATALOG } from "../routing/catalog";
 import { resolveAllRules } from "../routing/resolve";
+import type { CustomRule } from "../../db/schema";
+
+// 将自定义规则转为 Surge 规则行
+function renderCustomRules(rules: CustomRule[]): string[] {
+  const lines: string[] = [];
+  for (const rule of rules) {
+    const outbound = rule.action === "direct"
+      ? "DIRECT"
+      : rule.action === "reject"
+        ? "REJECT"
+        : "Proxy";
+    switch (rule.type) {
+      case "domain":
+        lines.push(`DOMAIN,${rule.value},${outbound}`);
+        break;
+      case "domain_suffix":
+        lines.push(`DOMAIN-SUFFIX,${rule.value},${outbound}`);
+        break;
+      case "domain_keyword":
+        lines.push(`DOMAIN-KEYWORD,${rule.value},${outbound}`);
+        break;
+      case "ip_cidr":
+        lines.push(`IP-CIDR,${rule.value},${outbound},no-resolve`);
+        break;
+    }
+  }
+  return lines;
+}
 
 function renderProxyLine(node: Node, password: string): string {
   const sni = node.sni || node.host;
@@ -61,6 +89,12 @@ export const surge: SubscriptionFormat = {
 
     // [Rule] — 动态生成
     lines.push("[Rule]");
+
+    // 自定义域名/IP 规则（优先级最高，排在分类规则之前）
+    const customRules = meta?.customRules ?? [];
+    if (customRules.length > 0) {
+      lines.push(...renderCustomRules(customRules));
+    }
 
     for (const { rule, outbound } of resolved) {
       const catalog = RULE_SET_CATALOG[rule.rule_set_key];

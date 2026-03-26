@@ -2,6 +2,34 @@ import type { User, Node } from "../../db/schema";
 import type { SubscriptionFormat, RenderMeta } from "./index";
 import { RULE_SET_CATALOG } from "../routing/catalog";
 import { resolveAllRules } from "../routing/resolve";
+import type { CustomRule } from "../../db/schema";
+
+// 将自定义规则转为 Clash 规则行
+function renderCustomRules(rules: CustomRule[]): string[] {
+  const lines: string[] = [];
+  for (const rule of rules) {
+    const outbound = rule.action === "direct"
+      ? "DIRECT"
+      : rule.action === "reject"
+        ? "REJECT"
+        : "Proxy";
+    switch (rule.type) {
+      case "domain":
+        lines.push(`  - DOMAIN,${rule.value},${outbound}`);
+        break;
+      case "domain_suffix":
+        lines.push(`  - DOMAIN-SUFFIX,${rule.value},${outbound}`);
+        break;
+      case "domain_keyword":
+        lines.push(`  - DOMAIN-KEYWORD,${rule.value},${outbound}`);
+        break;
+      case "ip_cidr":
+        lines.push(`  - IP-CIDR,${rule.value},${outbound},no-resolve`);
+        break;
+    }
+  }
+  return lines;
+}
 
 export const clash: SubscriptionFormat = {
   name: "clash",
@@ -37,6 +65,12 @@ export const clash: SubscriptionFormat = {
     // 构建 rule-providers 和 rules
     const providers: string[] = [];
     const rules: string[] = [];
+
+    // 自定义域名/IP 规则（优先级最高，排在分类规则之前）
+    const customRulesList = meta?.customRules ?? [];
+    if (customRulesList.length > 0) {
+      rules.push(...renderCustomRules(customRulesList));
+    }
 
     for (const { rule, outbound } of resolved) {
       const catalog = RULE_SET_CATALOG[rule.rule_set_key];
