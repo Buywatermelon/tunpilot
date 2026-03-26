@@ -83,6 +83,8 @@ export const surge: SubscriptionFormat = {
     if (directDomains.length > 0) {
       lines.push(`always-real-ip = ${directDomains.join(", ")}`);
     }
+    // Tailscale 100.x.x.x 网段不走 TUN，避免双 TUN 路由冲突
+    lines.push("tun-excluded-routes = 100.64.0.0/10");
     lines.push("");
 
     // [Proxy]
