@@ -85,6 +85,13 @@ export const surge: SubscriptionFormat = {
     }
     // Tailscale 100.x.x.x 网段不走 TUN，避免双 TUN 路由冲突
     lines.push("tun-excluded-routes = 100.64.0.0/10");
+    // 显式指定 DNS，避免被 Tailscale MagicDNS (100.100.100.100) 劫持
+    lines.push("dns-server = 1.1.1.1, 8.8.8.8");
+    lines.push("");
+
+    // [Host] — .ts.net 走 Tailscale MagicDNS，支持设备名解析
+    lines.push("[Host]");
+    lines.push("*.ts.net = server:100.100.100.100");
     lines.push("");
 
     // [Proxy]
