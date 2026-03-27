@@ -80,35 +80,6 @@ export const settings = sqliteTable("settings", {
 
 export type Setting = typeof settings.$inferSelect;
 
-// 分流规则表
-export const routingRules = sqliteTable("routing_rules", {
-  id: text("id").primaryKey(),
-  rule_set_key: text("rule_set_key").notNull(),
-  action: text("action").notNull(),
-  strict: integer("strict").default(0),
-  priority: integer("priority").default(0),
-  enabled: integer("enabled").default(1),
-  created_at: text("created_at").default(sql`(datetime('now'))`),
-});
-
-export type RoutingRule = typeof routingRules.$inferSelect;
-export type NewRoutingRule = typeof routingRules.$inferInsert;
-
-// 自定义域名/IP 分流规则表
-export const customRules = sqliteTable("custom_rules", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  type: text("type").notNull(), // "domain" | "domain_suffix" | "domain_keyword" | "ip_cidr"
-  value: text("value").notNull(),
-  action: text("action").notNull(), // "direct" | "reject" | "proxy"
-  priority: integer("priority").default(100),
-  enabled: integer("enabled").default(1),
-  description: text("description"),
-  created_at: text("created_at").default(sql`(datetime('now'))`),
-});
-
-export type CustomRule = typeof customRules.$inferSelect;
-export type NewCustomRule = typeof customRules.$inferInsert;
-
 // 从 schema 推导的类型
 export type Node = typeof nodes.$inferSelect;
 export type NewNode = typeof nodes.$inferInsert;

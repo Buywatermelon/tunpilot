@@ -155,17 +155,11 @@ describe("订阅服务", () => {
       expect(hy2Outbounds[0].tls.server_name).toBe("us-node.example.com");
     });
 
-    test("包含 selector 和 auto outbounds", () => {
+    test("仅输出 outbounds 数组（无 selector/urltest）", () => {
       const { user, nodes } = setupUserWithNodes();
       const config = JSON.parse(format.render(user, nodes));
-      const selector = config.outbounds.find((o: any) => o.type === "selector");
-      expect(selector).toBeDefined();
-      expect(selector.outbounds).toContain("BWG-US");
-      expect(selector.outbounds).toContain("IIJ-JP");
-
-      const auto = config.outbounds.find((o: any) => o.type === "urltest");
-      expect(auto).toBeDefined();
-      expect(auto.outbounds).toContain("BWG-US");
+      expect(config.outbounds).toHaveLength(2);
+      expect(config.outbounds.every((o: any) => o.type === "hysteria2")).toBe(true);
     });
   });
 
@@ -185,19 +179,11 @@ describe("订阅服务", () => {
       expect(yaml).toContain("sni: us-node.example.com");
     });
 
-    test("包含代理组", () => {
+    test("仅输出 proxies 数组（无 proxy-groups 和 rules）", () => {
       const { user, nodes } = setupUserWithNodes();
       const yaml = format.render(user, nodes);
-      expect(yaml).toContain("proxy-groups:");
-      expect(yaml).toContain('"BWG-US"');
-      expect(yaml).toContain('"IIJ-JP"');
-    });
-
-    test("包含路由规则", () => {
-      const { user, nodes } = setupUserWithNodes();
-      const yaml = format.render(user, nodes);
-      expect(yaml).toContain("rules:");
-      expect(yaml).toContain("MATCH,Proxy");
+      expect(yaml).not.toContain("proxy-groups:");
+      expect(yaml).not.toContain("rules:");
     });
   });
 
@@ -206,21 +192,21 @@ describe("订阅服务", () => {
   describe("渲染 Surge 配置", () => {
     const format = getFormat("surge")!;
 
-    test("生成包含代理节点的完整配置", () => {
+    test("生成代理行列表（无 Section 头）", () => {
       const { user, nodes } = setupUserWithNodes();
       const conf = format.render(user, nodes);
-      expect(conf).toContain("[General]");
-      expect(conf).toContain("[Proxy]");
-      expect(conf).toContain("[Proxy Group]");
-      expect(conf).toContain("[Rule]");
+      expect(conf).not.toContain("[General]");
+      expect(conf).not.toContain("[Proxy]");
+      expect(conf).not.toContain("[Proxy Group]");
+      expect(conf).not.toContain("[Rule]");
       expect(conf).toContain("BWG-US = hysteria2, us-node.example.com, 443, password=alice:secret123");
       expect(conf).toContain("IIJ-JP = hysteria2, jp-node.example.com, 443, password=alice:secret123");
     });
 
-    test("包含 MANAGED-CONFIG 头（当提供 subscriptionUrl 时）", () => {
+    test("不包含 MANAGED-CONFIG 头", () => {
       const { user, nodes } = setupUserWithNodes();
       const conf = format.render(user, nodes, { subscriptionUrl: "https://example.com/sub/token123" });
-      expect(conf).toContain("#!MANAGED-CONFIG https://example.com/sub/token123 interval=86400 strict=false");
+      expect(conf).not.toContain("#!MANAGED-CONFIG");
     });
 
     test("不包含 MANAGED-CONFIG 头（未提供 subscriptionUrl 时）", () => {
@@ -254,12 +240,11 @@ describe("订阅服务", () => {
       expect(conf).toContain("sni=5.6.7.8");
     });
 
-    test("包含代理组和规则", () => {
+    test("不包含代理组和规则", () => {
       const { user, nodes } = setupUserWithNodes();
       const conf = format.render(user, nodes);
-      expect(conf).toContain("Proxy = select");
-      expect(conf).toContain("Auto = url-test");
-      expect(conf).toContain("FINAL,Proxy");
+      expect(conf).not.toContain("Proxy = select");
+      expect(conf).not.toContain("FINAL,Proxy");
     });
   });
 

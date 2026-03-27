@@ -40,3 +40,12 @@ bun run db:push   # 同步 Drizzle schema 到 SQLite
 ## 设置系统
 
 `settings` 表存储 API key 等配置项，值脱敏展示。MCP 工具：set_setting / list_settings / delete_setting
+
+## 客户端格式支持
+
+| 格式 | 实现文件 | 协议 | 内容类型 | 说明 |
+|------|---------|------|---------|------|
+| **Sing-box** | [src/services/formats/singbox.ts](src/services/formats/singbox.ts) | Hysteria2, Trojan | `application/json` | 标准 JSON 配置，完整 outbound 和 route 定义 (ref: [sing-box.sagernet.org](https://sing-box.sagernet.org/)) |
+| **Clash** | [src/services/formats/clash.ts](src/services/formats/clash.ts) | Hysteria2, Trojan | `application/yaml` | YAML 格式，支持 Clash/ClashMeta 扩展 (ref: [clash.gitbook.io](https://clash.gitbook.io/)) |
+| **Surge** | [src/services/formats/surge.ts](src/services/formats/surge.ts) | Hysteria2, Trojan | `text/plain` | Surge 官方配置，分号分隔 port-hopping (ref: [manual.nssurge.com](https://manual.nssurge.com/)) |
+| **Shadowrocket** | [src/services/formats/shadowrocket.ts](src/services/formats/shadowrocket.ts) | Hysteria2, Trojan | `text/plain` (base64) | Base64 编码 URI 列表，hysteria2:// 和 trojan:// 协议 (ref: [shadowrocket.io](https://shadowrocket.io)) |

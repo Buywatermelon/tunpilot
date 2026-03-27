@@ -3,8 +3,6 @@ import type { Db } from "../db/index";
 import { subscriptions, type Subscription } from "../db/schema";
 import { getUser, getUserNodes } from "./user";
 import { getFormat } from "./formats/index";
-import { getActiveRules, getAllNodes, getActiveCustomRules } from "./routing/index";
-import { getAllSettings } from "./settings";
 
 export interface SubscriptionWithUrl extends Subscription {
   url?: string;
@@ -77,12 +75,8 @@ export function getSubscriptionConfig(
   if (!format) return null;
 
   const subscriptionUrl = baseUrl ? `${baseUrl}/sub/${token}` : undefined;
-  const routingRules = getActiveRules(db);
-  const customRules = getActiveCustomRules(db);
-  const allNodes = getAllNodes(db);
-  const settings = getAllSettings(db);
   return {
-    content: format.render(user, nodes, { subscriptionUrl, routingRules, customRules, allNodes, settings }),
+    content: format.render(user, nodes, { subscriptionUrl }),
     contentType: format.contentType,
   };
 }

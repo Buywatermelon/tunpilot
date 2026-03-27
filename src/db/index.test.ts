@@ -20,8 +20,6 @@ describe("database", () => {
     expect(names).toContain("subscriptions");
     expect(names).toContain("traffic_logs");
     expect(names).toContain("settings");
-    expect(names).toContain("routing_rules");
-    expect(names).toContain("custom_rules");
   });
 
   test("幂等（可安全调用多次）", () => {
@@ -84,11 +82,4 @@ describe("database", () => {
     expect(rows).toHaveLength(0);
   });
 
-  test("默认分流规则插入", () => {
-    db = initDatabase(":memory:");
-    const rules = db.$client.query("SELECT id, rule_set_key, action FROM routing_rules ORDER BY priority DESC").all() as { id: string; rule_set_key: string; action: string }[];
-    expect(rules).toHaveLength(4);
-    expect(rules[0]).toMatchObject({ id: "private-direct", action: "direct" });
-    expect(rules[3]).toMatchObject({ id: "catch-all", action: "proxy" });
-  });
 });

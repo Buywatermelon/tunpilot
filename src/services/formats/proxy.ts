@@ -40,13 +40,3 @@ export function buildProxyConfig(node: Node, user: User): ProxyConfig {
 
   return config;
 }
-
-/** Map internal outbound names to Surge/Clash display names */
-export function mapOutbound(outbound: string): string {
-  switch (outbound) {
-    case "direct": return "DIRECT";
-    case "reject": return "REJECT";
-    case "proxy": return "Proxy";
-    default: return outbound;
-  }
-}
