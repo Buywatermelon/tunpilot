@@ -12,9 +12,6 @@ function buildUri(p: ProxyConfig): string {
     const params = new URLSearchParams();
     params.set("peer", p.sni);
     if (p.insecure) params.set("insecure", "1");
-    if (p.portHopping) {
-      params.set("mport", p.portHopping);
-    }
     return `hysteria2://${encodeURIComponent(p.password)}@${p.server}:${p.port}?${params.toString()}#${encodeURIComponent(p.name)}`;
   }
 

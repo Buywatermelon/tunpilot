@@ -9,7 +9,6 @@ export interface ProxyConfig {
   sni: string;
   insecure: boolean;
   certFingerprint?: string;
-  portHopping?: string;
 }
 
 export function buildProxyConfig(node: Node, user: User): ProxyConfig {
@@ -27,10 +26,6 @@ export function buildProxyConfig(node: Node, user: User): ProxyConfig {
 
   if (node.cert_fingerprint && node.protocol === "trojan") {
     config.certFingerprint = node.cert_fingerprint;
-  }
-
-  if (node.port_hopping && node.protocol !== "trojan") {
-    config.portHopping = node.port_hopping;
   }
 
   return config;
