@@ -2,6 +2,7 @@ import { eq, and } from "drizzle-orm";
 import type { Db } from "../../db/index";
 import { nodes, users, userNodes, type Node, type User } from "../../db/schema";
 import { sshExec, sshWriteFile } from "./ssh";
+import { isCallAllowed, recordSuccess, recordFailure } from "../../lib/circuit-breaker";
 
 const DEFAULT_CONFIG_PATH = "/usr/local/etc/xray/config.json";
 const INBOUND_TAG = "trojan-in";
@@ -80,6 +81,12 @@ export async function deployNodeUsers(db: Db, node: Node): Promise<ReconcileResu
       return result;
     }
 
+    const circuitKey = `xray:${node.id}`;
+    if (!isCallAllowed(circuitKey)) {
+      result.errors.push(`Circuit open for node ${node.name}, skipping deploy`);
+      return result;
+    }
+
     try {
       const activeUsers = getNodeActiveUsers(db, node.id);
       const desiredClients = activeUsers
@@ -103,6 +110,7 @@ export async function deployNodeUsers(db: Db, node: Node): Promise<ReconcileResu
       // Skip restart if config already matches desired state
       if (JSON.stringify(desiredClients) === JSON.stringify(currentClients)) {
         result.added = desiredClients.length;
+        recordSuccess(circuitKey);
         return result;
       }
 
@@ -111,7 +119,9 @@ export async function deployNodeUsers(db: Db, node: Node): Promise<ReconcileResu
       await sshExec(node, "systemctl restart xray");
 
       result.added = desiredClients.length;
+      recordSuccess(circuitKey);
     } catch (err: any) {
+      recordFailure(circuitKey);
       result.errors.push(err.message);
     }
 

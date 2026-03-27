@@ -40,6 +40,7 @@ export function register(server: McpServer, db: Db, baseUrl: string) {
         ssh_alias: z.string().optional().describe("SSH config alias for this node (e.g. 'bwg', 'voyra'). Used instead of ssh_user@host when set"),
         cert_fingerprint: z.string().optional().describe("SHA-256 hex fingerprint for self-signed cert pinning"),
         insecure: z.number().optional().describe("1 = self-signed cert (skip verification), 0 = valid cert"),
+        obfs_password: z.string().optional().describe("Salamander obfuscation password (Hysteria2 only). When set, subscription configs include obfs params"),
       },
     },
     async (args) => {
@@ -73,6 +74,7 @@ export function register(server: McpServer, db: Db, baseUrl: string) {
         ssh_alias: z.string().optional().describe("SSH config alias for this node"),
         cert_fingerprint: z.string().optional().describe("SHA-256 hex fingerprint for self-signed cert pinning"),
         insecure: z.number().optional().describe("1 = self-signed cert, 0 = valid cert"),
+        obfs_password: z.string().optional().describe("Salamander obfuscation password (Hysteria2 only)"),
         enabled: z.number().optional().describe("1 = enabled, 0 = disabled"),
       },
     },

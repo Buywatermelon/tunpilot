@@ -69,6 +69,7 @@ export async function ensureTunnel(node: Node): Promise<number> {
 
   const args = [
     "ssh", "-N",
+    "-o", "ConnectTimeout=10",
     "-o", "ExitOnForwardFailure=yes",
     "-o", "ServerAliveInterval=30",
     "-o", "ServerAliveCountMax=3",

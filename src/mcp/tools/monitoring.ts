@@ -5,6 +5,7 @@ import { listNodes } from "../../services/node";
 import { eq, and, gte, lt, sql } from "drizzle-orm";
 import { trafficLogs } from "../../db/schema";
 import { getXrayClient } from "../../services/xray/pool";
+import { isCallAllowed } from "../../lib/circuit-breaker";
 
 // 注册监控工具（2 个）：check_health, get_traffic_stats
 export function register(server: McpServer, db: Db, _baseUrl: string) {
@@ -16,7 +17,7 @@ export function register(server: McpServer, db: Db, _baseUrl: string) {
     },
     async () => {
       const nodes = listNodes(db);
-      const results = await Promise.all(
+      const settled = await Promise.allSettled(
         nodes.map(async (node) => {
           const base = {
             id: node.id,
@@ -27,6 +28,13 @@ export function register(server: McpServer, db: Db, _baseUrl: string) {
           };
 
           if (!node.enabled) return { ...base, status: "disabled" as const };
+
+          // Circuit breaker check — skip nodes with open circuits
+          const trafficKey = `traffic:${node.id}`;
+          const xrayKey = `xray:${node.id}`;
+          if (!isCallAllowed(trafficKey) || !isCallAllowed(xrayKey)) {
+            return { ...base, status: "circuit_open" as const };
+          }
 
           // 如果配置了 stats_port，实际 ping 节点
           if (node.stats_port) {
@@ -44,24 +52,35 @@ export function register(server: McpServer, db: Db, _baseUrl: string) {
                   `http://${node.host}:${node.stats_port}/traffic`,
                   {
                     headers: { Authorization: node.stats_secret },
-                    signal: AbortSignal.timeout(5000),
-                  }
+                    signal: AbortSignal.timeout(5_000),
+                  },
                 );
                 return { ...base, status: res.ok ? "online" as const : `error_${res.status}` };
               }
-            } catch {
+            } catch (err: any) {
+              console.error(JSON.stringify({
+                event: "health_check_failed",
+                nodeId: node.id,
+                error: err.message,
+              }));
               return { ...base, status: "unreachable" as const };
             }
           }
 
           return { ...base, status: "registered" as const };
-        })
+        }),
+      );
+
+      const results = settled.map((r, i) =>
+        r.status === "fulfilled"
+          ? r.value
+          : { id: nodes[i]!.id, name: nodes[i]!.name, status: "error" as const },
       );
 
       return {
         content: [{ type: "text", text: JSON.stringify({ nodes: results }) }],
       };
-    }
+    },
   );
 
   server.registerTool(
@@ -90,21 +109,24 @@ export function register(server: McpServer, db: Db, _baseUrl: string) {
         })
         .from(trafficLogs)
         .where(where)
-        .get()!;
+        .get();
+
+      const total_tx = row?.total_tx ?? 0;
+      const total_rx = row?.total_rx ?? 0;
 
       return {
         content: [
           {
             type: "text",
             text: JSON.stringify({
-              total_tx: row.total_tx,
-              total_rx: row.total_rx,
-              total_bytes: row.total_tx + row.total_rx,
+              total_tx,
+              total_rx,
+              total_bytes: total_tx + total_rx,
             }),
           },
         ],
       };
-    }
+    },
   );
 
 }

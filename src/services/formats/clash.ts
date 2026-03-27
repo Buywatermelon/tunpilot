@@ -29,6 +29,9 @@ export const clash: SubscriptionFormat = {
         if (n.insecure) {
           entry += `\n    skip-cert-verify: true`;
         }
+        if (n.obfs_password && n.protocol !== "trojan") {
+          entry += `\n    obfs: salamander\n    obfs-password: "${n.obfs_password}"`;
+        }
         return entry;
       })
       .join("\n\n");

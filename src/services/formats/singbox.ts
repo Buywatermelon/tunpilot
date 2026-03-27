@@ -81,7 +81,11 @@ export const singbox: SubscriptionFormat = {
       if (n.protocol === "trojan") {
         return { type: "trojan" as const, tag: n.name, server: n.host, server_port: n.port, password: user.password, tls };
       }
-      return { type: "hysteria2" as const, tag: n.name, server: n.host, server_port: n.port, password: user.password, tls };
+      const hy2: Record<string, unknown> = { type: "hysteria2" as const, tag: n.name, server: n.host, server_port: n.port, password: user.password, tls };
+      if (n.obfs_password) {
+        hy2.obfs = { type: "salamander", password: n.obfs_password };
+      }
+      return hy2;
     });
 
     // 动态构建 route.rules 和 route.rule_set

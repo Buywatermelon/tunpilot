@@ -2,6 +2,7 @@ import { eq, and, gte, lt, sql, isNotNull } from "drizzle-orm";
 import type { Db } from "../db/index";
 import { nodes, users, trafficLogs, type Node } from "../db/schema";
 import { getXrayClient } from "./xray/pool";
+import { isCallAllowed, recordSuccess, recordFailure } from "../lib/circuit-breaker";
 
 export interface SyncResult {
   nodeId: string;
@@ -92,21 +93,47 @@ async function syncTrafficFromXrayNode(db: Db, node: Node): Promise<SyncResult> 
 // 从单个节点同步流量数据（协议分发）
 export async function syncTrafficFromNode(
   db: Db,
-  node: Node
+  node: Node,
 ): Promise<SyncResult> {
-  // Xray/Trojan 节点使用 gRPC 流量查询
-  if (node.protocol === "trojan") {
-    return syncTrafficFromXrayNode(db, node);
+  const circuitKey = `traffic:${node.id}`;
+
+  if (!isCallAllowed(circuitKey)) {
+    return {
+      nodeId: node.id,
+      synced: 0,
+      errors: [`Circuit open for node ${node.name}, skipping sync`],
+    };
   }
 
-  // Hysteria2 节点使用 HTTP stats API
+  try {
+    const result = node.protocol === "trojan"
+      ? await syncTrafficFromXrayNode(db, node)
+      : await syncTrafficFromHysteria(db, node);
+
+    if (result.errors.length === 0) {
+      recordSuccess(circuitKey);
+    } else {
+      recordFailure(circuitKey);
+    }
+    return result;
+  } catch (err: any) {
+    recordFailure(circuitKey);
+    return { nodeId: node.id, synced: 0, errors: [err.message] };
+  }
+}
+
+// Hysteria2 节点使用 HTTP stats API
+async function syncTrafficFromHysteria(db: Db, node: Node): Promise<SyncResult> {
   const result: SyncResult = { nodeId: node.id, synced: 0, errors: [] };
 
   let data: Record<string, { tx: number; rx: number }>;
   try {
     const res = await fetch(
       `http://${node.host}:${node.stats_port}/traffic?clear=1`,
-      { headers: { Authorization: node.stats_secret! } }
+      {
+        headers: { Authorization: node.stats_secret! },
+        signal: AbortSignal.timeout(10_000),
+      },
     );
     if (!res.ok) {
       result.errors.push(`HTTP ${res.status} from node ${node.name}`);
@@ -174,15 +201,29 @@ export async function syncAllNodes(db: Db): Promise<SyncResult[]> {
     .where(and(eq(nodes.enabled, 1), isNotNull(nodes.stats_port)))
     .all();
 
+  const start = Date.now();
   const settled = await Promise.allSettled(
-    enabledNodes.map((node) => syncTrafficFromNode(db, node))
+    enabledNodes.map((node) => syncTrafficFromNode(db, node)),
   );
 
-  return settled.map((r, i) =>
+  const results = settled.map((r, i) =>
     r.status === "fulfilled"
       ? r.value
-      : { nodeId: enabledNodes[i]!.id, synced: 0, errors: [String(r.reason)] }
+      : { nodeId: enabledNodes[i]!.id, synced: 0, errors: [String(r.reason)] },
   );
+
+  const failed = results.filter((r) => r.errors.length > 0);
+  if (failed.length > 0) {
+    console.error(JSON.stringify({
+      event: "traffic_sync",
+      duration_ms: Date.now() - start,
+      total: enabledNodes.length,
+      failed: failed.length,
+      errors: failed.map((r) => ({ nodeId: r.nodeId, error: r.errors[0] })),
+    }));
+  }
+
+  return results;
 }
 
 // 查询流量统计（支持多维度筛选）

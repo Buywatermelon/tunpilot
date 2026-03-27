@@ -20,6 +20,9 @@ function renderProxyLine(node: Node, password: string): string {
   if (node.insecure === 1) {
     parts.push("skip-cert-verify=true");
   }
+  if (node.obfs_password && node.protocol !== "trojan") {
+    parts.push(`obfs=salamander`, `obfs-password=${node.obfs_password}`);
+  }
   return parts.join(", ");
 }
 

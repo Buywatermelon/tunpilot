@@ -132,6 +132,7 @@ export function initDatabase(path: string): Db {
   try { sqlite.run(`ALTER TABLE nodes ADD COLUMN insecure INTEGER DEFAULT 0`); } catch {}
   try { sqlite.run(`ALTER TABLE nodes ADD COLUMN ssh_alias TEXT`); } catch {}
   try { sqlite.run(`ALTER TABLE nodes ADD COLUMN cert_fingerprint TEXT`); } catch {}
+  try { sqlite.run(`ALTER TABLE nodes ADD COLUMN obfs_password TEXT`); } catch {}
   // 升级 password 索引为 UNIQUE（先删旧索引再建新索引）
   try {
     sqlite.run(`DROP INDEX IF EXISTS idx_users_password`);

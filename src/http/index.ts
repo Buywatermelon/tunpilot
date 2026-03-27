@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { Db } from "../db/index";
 import { authenticate } from "../services/auth";
 import { getSubscriptionConfig } from "../services/subscription";
+import { getAllCircuitStates } from "../lib/circuit-breaker";
 
 export function createHttpApp(db: Db, baseUrl: string): Hono {
   const app = new Hono();
@@ -38,7 +39,12 @@ export function createHttpApp(db: Db, baseUrl: string): Hono {
 
   // 健康检查
   app.get("/health", (c) => {
-    return c.json({ status: "ok", timestamp: new Date().toISOString() });
+    const circuits = getAllCircuitStates();
+    return c.json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      circuits: Object.keys(circuits).length > 0 ? circuits : undefined,
+    });
   });
 
   return app;

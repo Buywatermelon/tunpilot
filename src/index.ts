@@ -106,6 +106,7 @@ const xrayReconcileTimer = setInterval(() => {
 const server = Bun.serve({
   port: config.port,
   hostname: config.host,
+  idleTimeout: 30, // seconds — avoid spurious timeout logs (default is 10)
   fetch: app.fetch,
 });
 

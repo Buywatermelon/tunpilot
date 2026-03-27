@@ -15,6 +15,8 @@ const statsProto = grpc.loadPackageDefinition(statsDef);
 
 const StatsService = (statsProto.xray as any).app.stats.command.StatsService;
 
+const GRPC_TIMEOUT = 15_000; // ms
+
 export interface TrafficData {
   tx: number;
   rx: number;
@@ -39,9 +41,12 @@ export class XrayClient {
    * @param reset - If true, resets counters after reading (like hy2's clear=1)
    */
   queryTraffic(reset: boolean = true): Promise<Map<string, TrafficData>> {
+    const deadline = new Date(Date.now() + GRPC_TIMEOUT);
+
     return new Promise((resolve, reject) => {
       this.stats.QueryStats(
         { pattern: "user>>>", reset },
+        { deadline },
         (err: grpc.ServiceError | null, response: any) => {
           if (err) return reject(err);
 
@@ -67,7 +72,7 @@ export class XrayClient {
           }
 
           resolve(result);
-        }
+        },
       );
     });
   }
