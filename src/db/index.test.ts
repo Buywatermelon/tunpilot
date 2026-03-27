@@ -121,6 +121,84 @@ describe("database", () => {
     expect(row.id).toBe("n1");
     expect(row.name).toBe("US");
 
+    // 验证 FK 修复：依赖表不应指向 nodes_old
+    for (const table of ["user_nodes", "traffic_logs"]) {
+      const fks = db.$client.query(`PRAGMA foreign_key_list(${table})`).all() as Array<{ table: string }>;
+      for (const fk of fks) {
+        expect(fk.table).not.toContain("_old");
+      }
+    }
+
+    db.$client.close();
+    db = undefined as unknown as Db;
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("修复依赖表中指向已不存在表的外键引用", () => {
+    const dir = mkdtempSync(join(tmpdir(), "tunpilot-db-"));
+    const path = join(dir, "stale-fk.db");
+    const raw = new Database(path);
+
+    // 模拟 rebuildNodesTableWithoutAuthSecret 留下的后遗症：
+    // traffic_logs 和 user_nodes 的 FK 指向 nodes_old
+    raw.run("PRAGMA foreign_keys = OFF");
+    raw.run(`CREATE TABLE nodes (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL, host TEXT NOT NULL,
+      port INTEGER NOT NULL, protocol TEXT NOT NULL,
+      stats_port INTEGER, stats_secret TEXT, sni TEXT, cert_path TEXT,
+      cert_expires TEXT, hy2_version TEXT, config_path TEXT, ssh_user TEXT,
+      ssh_port INTEGER DEFAULT 22, ssh_alias TEXT, cert_fingerprint TEXT,
+      insecure INTEGER DEFAULT 0, obfs_password TEXT, enabled INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`);
+    raw.run(`CREATE TABLE users (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, password TEXT NOT NULL UNIQUE,
+      quota_bytes INTEGER DEFAULT 0, used_bytes INTEGER DEFAULT 0,
+      expires_at TEXT, max_devices INTEGER DEFAULT 3, enabled INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`);
+    // 故意让 FK 指向 nodes_old（模拟 SQLite rename 的副作用）
+    raw.run(`CREATE TABLE user_nodes (
+      user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+      node_id TEXT REFERENCES nodes_old(id) ON DELETE CASCADE,
+      PRIMARY KEY (user_id, node_id)
+    )`);
+    raw.run(`CREATE TABLE traffic_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT REFERENCES users(id),
+      node_id TEXT REFERENCES nodes_old(id),
+      tx_bytes INTEGER DEFAULT 0, rx_bytes INTEGER DEFAULT 0,
+      recorded_at TEXT DEFAULT (datetime('now'))
+    )`);
+    raw.run("INSERT INTO nodes VALUES ('n1','US','host',443,'hysteria2',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,22,NULL,NULL,0,NULL,1,datetime('now'))");
+    raw.run("INSERT INTO users VALUES ('u1','alice','pass',0,0,NULL,3,1,datetime('now'))");
+    raw.run("INSERT INTO user_nodes VALUES ('u1','n1')");
+    raw.run("INSERT INTO traffic_logs (user_id,node_id,tx_bytes,rx_bytes) VALUES ('u1','n1',100,200)");
+    raw.run("PRAGMA foreign_keys = ON");
+    raw.close();
+
+    db = initDatabase(path);
+
+    // 验证 FK 修复后指向 nodes 而非 nodes_old
+    for (const table of ["user_nodes", "traffic_logs"]) {
+      const fks = db.$client.query(`PRAGMA foreign_key_list(${table})`).all() as Array<{ table: string }>;
+      for (const fk of fks) {
+        expect(fk.table).not.toContain("_old");
+      }
+    }
+
+    // 验证数据完整性
+    const un = db.$client.query("SELECT * FROM user_nodes").all();
+    expect(un).toHaveLength(1);
+    const tl = db.$client.query("SELECT * FROM traffic_logs").all();
+    expect(tl).toHaveLength(1);
+
+    // 验证 FK 约束实际生效（删除 node 应级联删除 user_nodes）
+    // traffic_logs 没有 ON DELETE CASCADE，需先清除引用
+    db.$client.run("DELETE FROM traffic_logs WHERE node_id = 'n1'");
+    db.$client.run("DELETE FROM nodes WHERE id = 'n1'");
+    expect(db.$client.query("SELECT * FROM user_nodes").all()).toHaveLength(0);
+
     db.$client.close();
     db = undefined as unknown as Db;
     rmSync(dir, { recursive: true, force: true });

@@ -99,6 +99,58 @@ function migrateNodesTable(sqlite: Database): void {
   }
 }
 
+/**
+ * Repair tables whose FK references point to a non-existent table (e.g. "nodes_old").
+ * This can happen when a table is rebuilt via rename→create→copy→drop→rename,
+ * because SQLite updates FK references in dependent tables to follow the rename.
+ */
+function repairStaleForeignKeys(sqlite: Database): void {
+  const existingTables = new Set(
+    (sqlite.query("SELECT name FROM sqlite_master WHERE type='table'").all() as Array<{ name: string }>)
+      .map((r) => r.name),
+  );
+
+  const tablesToRebuild: string[] = [];
+  for (const table of existingTables) {
+    const fks = sqlite.query(`PRAGMA foreign_key_list(${table})`).all() as Array<{ table: string }>;
+    for (const fk of fks) {
+      if (!existingTables.has(fk.table)) {
+        tablesToRebuild.push(table);
+        break;
+      }
+    }
+  }
+
+  if (tablesToRebuild.length === 0) return;
+
+  console.log(`Repairing stale FK references in: ${tablesToRebuild.join(", ")}`);
+  sqlite.run("PRAGMA foreign_keys = OFF");
+  try {
+    sqlite.run("BEGIN");
+    for (const table of tablesToRebuild) {
+      const createSql = (
+        sqlite.query("SELECT sql FROM sqlite_master WHERE type='table' AND name=?").get(table) as { sql: string }
+      ).sql;
+
+      // Fix any stale table references (e.g. nodes_old → nodes)
+      const fixedSql = createSql.replace(/REFERENCES\s+"?(\w+)_old"?\s*\(/gi, "REFERENCES $1(");
+      const columns = getTableColumns(sqlite, table).map((c) => `"${c}"`).join(", ");
+
+      sqlite.run(`ALTER TABLE "${table}" RENAME TO "${table}_repair_old"`);
+      sqlite.run(fixedSql);
+      sqlite.run(`INSERT INTO "${table}" (${columns}) SELECT ${columns} FROM "${table}_repair_old"`);
+      sqlite.run(`DROP TABLE "${table}_repair_old"`);
+    }
+    sqlite.run("COMMIT");
+    console.log("FK repair complete.");
+  } catch (err) {
+    try { sqlite.run("ROLLBACK"); } catch {}
+    throw err;
+  } finally {
+    sqlite.run("PRAGMA foreign_keys = ON");
+  }
+}
+
 // 初始化数据库：创建表 + 返回 Drizzle 实例
 export function initDatabase(path: string): Db {
   const sqlite = new Database(path);
@@ -208,6 +260,9 @@ export function initDatabase(path: string): Db {
     sqlite.run(`DROP INDEX IF EXISTS idx_users_password`);
     sqlite.run(`CREATE UNIQUE INDEX idx_users_password ON users(password)`);
   } catch {}
+
+  // 修复因 table rebuild 导致的 FK 指向不存在表的问题
+  repairStaleForeignKeys(sqlite);
 
   return drizzle(sqlite, { schema });
 }
