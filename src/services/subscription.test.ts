@@ -121,16 +121,16 @@ describe("订阅服务", () => {
 
   // --- renderShadowrocket (via Format Registry) ---
 
-  describe("Shadowrocket 别名返回 Surge 配置", () => {
+  describe("Shadowrocket 返回 base64 编码 URI 列表", () => {
     const format = getFormat("shadowrocket")!;
 
-    test("shadowrocket 格式已注册且返回 Surge 内容", () => {
+    test("shadowrocket 格式已注册且返回 base64 URI", () => {
       expect(format).toBeDefined();
       const { user, nodes } = setupUserWithNodes();
       const result = format.render(user, nodes);
-      expect(result).toContain("[Proxy]");
-      expect(result).toContain("[Rule]");
-      expect(result).toContain("BWG-US");
+      const decoded = Buffer.from(result, "base64").toString();
+      expect(decoded).toContain("hysteria2://");
+      expect(decoded).toContain("BWG-US");
     });
   });
 
@@ -281,14 +281,14 @@ describe("订阅服务", () => {
   // --- getSubscriptionConfig ---
 
   describe("获取订阅配置", () => {
-    test("返回 Shadowrocket 配置（Surge 别名，text/plain 类型）", () => {
+    test("返回 Shadowrocket 配置（base64 URI 列表，text/plain 类型）", () => {
       const { user } = setupUserWithNodes();
       const sub = generateSubscription(db, user.id, "shadowrocket");
       const result = getSubscriptionConfig(db, sub.token);
       expect(result).not.toBeNull();
       expect(result!.contentType).toBe("text/plain; charset=utf-8");
-      expect(result!.content).toContain("[Proxy]");
-      expect(result!.content).toContain("[Rule]");
+      const decoded = Buffer.from(result!.content, "base64").toString();
+      expect(decoded).toContain("hysteria2://");
     });
 
     test("返回 Sing-box 配置（application/json 类型）", () => {
@@ -333,8 +333,9 @@ describe("订阅服务", () => {
       assignNodesToUser(db, user.id, [n1.id, n2.id]);
       const sub = generateSubscription(db, user.id, "shadowrocket");
       const result = getSubscriptionConfig(db, sub.token);
-      expect(result!.content).toContain("Enabled-Node");
-      expect(result!.content).not.toContain("Disabled-Node");
+      const decoded = Buffer.from(result!.content, "base64").toString();
+      expect(decoded).toContain("Enabled-Node");
+      expect(decoded).not.toContain("Disabled-Node");
     });
   });
 });

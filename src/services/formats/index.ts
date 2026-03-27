@@ -36,7 +36,8 @@ export function getAllFormatNames(): string[] {
 
 import { singbox } from "./singbox";
 import { clash } from "./clash";
-import { surge, shadowrocket } from "./surge";
+import { surge } from "./surge";
+import { shadowrocket } from "./shadowrocket";
 
 registerFormat(singbox);
 registerFormat(clash);

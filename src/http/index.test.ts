@@ -56,15 +56,15 @@ describe("GET /sub/:token", () => {
     return { node, user, sub };
   }
 
-  test("shadowrocket returns surge config (alias)", async () => {
+  test("shadowrocket returns base64 URI list", async () => {
     const { sub } = setupUserWithSub("shadowrocket");
     const res = await req(`/sub/${sub.token}`);
 
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("text/plain");
     const text = await res.text();
-    expect(text).toContain("[Proxy]");
-    expect(text).toContain("[Rule]");
+    const decoded = Buffer.from(text, "base64").toString();
+    expect(decoded).toContain("hysteria2://");
   });
 
   test("singbox returns application/json", async () => {

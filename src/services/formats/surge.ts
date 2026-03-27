@@ -5,9 +5,7 @@ import { resolveAllRules } from "../routing/resolve";
 import { renderSurgeStyleRules } from "./custom-rule-utils";
 import { buildProxyConfig, mapOutbound, type ProxyConfig } from "./proxy";
 
-type Variant = "surge" | "shadowrocket";
-
-function renderProxyLine(p: ProxyConfig, variant: Variant): string {
+function renderProxyLine(p: ProxyConfig): string {
   const parts = [
     `${p.name} = ${p.protocol}`,
     p.server,
@@ -25,21 +23,16 @@ function renderProxyLine(p: ProxyConfig, variant: Variant): string {
     parts.push(`obfs=${p.obfs.type}`, `obfs-password=${p.obfs.password}`);
   }
   if (p.portHopping) {
-    if (variant === "surge") {
-      // Surge 官方语法：分号分隔端口范围
-      parts.push(`port-hopping=${p.portHopping.replace(/,/g, ";")}`, `port-hopping-interval=30`);
-    } else {
-      parts.push(`ports=${p.portHopping}`, `hop-interval=30`);
-    }
+    // Surge 官方语法：分号分隔端口范围
+    parts.push(`port-hopping=${p.portHopping.replace(/,/g, ";")}`, `port-hopping-interval=30`);
   }
   return parts.join(", ");
 }
 
-function createRenderer(variant: Variant): SubscriptionFormat {
-  return {
-    name: variant,
-    contentType: "text/plain; charset=utf-8",
-    render(user: User, nodes: Node[], meta?: RenderMeta): string {
+export const surge: SubscriptionFormat = {
+  name: "surge",
+  contentType: "text/plain; charset=utf-8",
+  render(user: User, nodes: Node[], meta?: RenderMeta): string {
     const routingRules = meta?.routingRules ?? [];
     const allNodes = meta?.allNodes ?? nodes;
     const resolved = resolveAllRules(routingRules, nodes, allNodes);
@@ -93,7 +86,7 @@ function createRenderer(variant: Variant): SubscriptionFormat {
     lines.push("[Proxy]");
     lines.push("DIRECT = direct");
     for (const node of nodes) {
-      lines.push(renderProxyLine(buildProxyConfig(node, user), variant));
+      lines.push(renderProxyLine(buildProxyConfig(node, user)));
     }
     lines.push("");
 
@@ -146,7 +139,3 @@ function createRenderer(variant: Variant): SubscriptionFormat {
     return lines.join("\n");
   },
 };
-}
-
-export const surge = createRenderer("surge");
-export const shadowrocket = createRenderer("shadowrocket");
