@@ -28,14 +28,14 @@ bun run db:push   # 同步 Drizzle schema 到 SQLite
 - `skills/` 是 Skill 的唯一来源，CI 自动同步到 `plugin/skills/`，禁止手动复制
 - 增删 Skill 时需 bump `plugin/.claude-plugin/plugin.json` 的 version（marketplace 按版本号缓存）
 
-## 分流规则架构
+## 订阅架构
 
-三层分离：Catalog（匹配什么）→ routing_rules 表（执行什么动作）→ Renderers（按格式输出）
+节点与规则分离：TunPilot 只输出节点信息，分流规则由用户在客户端自行管理。
 
-- **Catalog** (`src/services/routing/catalog.ts`)：16 个静态分类（openai/netflix/cn/ads 等），每个定义 sing-box/Clash/Surge 三种格式的上游 URL
-- **routing_rules 表**：动态绑定，key→action 映射，支持 strict 模式（宁断不降）
-- **上游源**：sing-box 用 MetaCubeX .srs，Clash/Surge 用 blackmatrix7 远程规则
-- **MCP 工具**：list_rule_sets / list_routing_rules / set_routing_rule / remove_routing_rule
+- **Surge** → 外部代理列表（`policy-path` 引用）
+- **Clash** → proxy-provider 格式（`proxy-providers` 引用）
+- **sing-box** → outbounds JSON（outbound provider 引用）
+- **Shadowrocket** → base64 编码 URI 列表
 
 ## 设置系统
 
@@ -45,7 +45,7 @@ bun run db:push   # 同步 Drizzle schema 到 SQLite
 
 | 格式 | 实现文件 | 协议 | 内容类型 | 说明 |
 |------|---------|------|---------|------|
-| **Sing-box** | [src/services/formats/singbox.ts](src/services/formats/singbox.ts) | Hysteria2, Trojan | `application/json` | 标准 JSON 配置，完整 outbound 和 route 定义 (ref: [sing-box.sagernet.org](https://sing-box.sagernet.org/)) |
-| **Clash** | [src/services/formats/clash.ts](src/services/formats/clash.ts) | Hysteria2, Trojan | `application/yaml` | YAML 格式，支持 Clash/ClashMeta 扩展 (ref: [clash.gitbook.io](https://clash.gitbook.io/)) |
-| **Surge** | [src/services/formats/surge.ts](src/services/formats/surge.ts) | Hysteria2, Trojan | `text/plain` | Surge 官方配置，分号分隔 port-hopping (ref: [manual.nssurge.com](https://manual.nssurge.com/)) |
-| **Shadowrocket** | [src/services/formats/shadowrocket.ts](src/services/formats/shadowrocket.ts) | Hysteria2, Trojan | `text/plain` (base64) | Base64 编码 URI 列表，hysteria2:// 和 trojan:// 协议 (ref: [shadowrocket.io](https://shadowrocket.io)) |
+| **Sing-box** | [src/services/formats/singbox.ts](src/services/formats/singbox.ts) | Hysteria2, Trojan | `application/json` | outbounds JSON 数组，通过 outbound_providers 引用 |
+| **Clash** | [src/services/formats/clash.ts](src/services/formats/clash.ts) | Hysteria2, Trojan | `text/yaml` | proxy-provider 格式（仅 proxies 数组），通过 proxy-providers 引用 |
+| **Surge** | [src/services/formats/surge.ts](src/services/formats/surge.ts) | Hysteria2, Trojan | `text/plain` | 外部代理列表，通过 policy-path 引用，分号分隔 port-hopping |
+| **Shadowrocket** | [src/services/formats/shadowrocket.ts](src/services/formats/shadowrocket.ts) | Hysteria2, Trojan | `text/plain` (base64) | Base64 编码 URI 列表，hysteria2:// 和 trojan:// 协议 |

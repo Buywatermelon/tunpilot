@@ -10,10 +10,9 @@ Agent-native 代理节点管理服务。通过 MCP (Model Context Protocol) 提�
 
 - **节点管理** — 注册、更新、启用/禁用 Hysteria2 / Xray(Trojan) 代理节点
 - **用户管理** — 创建用户、分配节点权限、设置流量配额和有效期
-- **订阅生成** — 支持 Sing-box、Clash、Surge 格式（Shadowrocket 自动使用 Surge 配置）
+- **订阅生成** — 支持 Sing-box、Clash、Surge、Shadowrocket 格式（nodes-only，分流规则由客户端管理）
 - **流量监控** — 自动从节点同步流量数据，实时配额检查
 - **节点诊断** — 通过 SSH 直连节点执行 IP 质量扫描（风控得分、流媒体解锁）和网络测速（路由、延迟）
-- **分流规则** — 16 个流量分类（OpenAI / Netflix / CN / Ads 等），支持按分类指定 direct / reject / proxy / 指定节点
 - **节点侧认证** — Hysteria2 使用原生 `userpass`，TunPilot 通过 SSH 异步下发配置，不处于鉴权热路径
 
 ## 效果演示
@@ -81,7 +80,7 @@ Agent 会自动加载 `getting-started` skill，引导完成：
 
 ## MCP Tools
 
-连接后通过 MCP 暴露 24 个工具，分为六组：
+连接后通过 MCP 暴露 23 个工具，分为五组：
 
 ### 节点管理（5 个）
 | 工具 | 说明 |
@@ -113,14 +112,6 @@ Agent 会自动加载 `getting-started` skill，引导完成：
 | `delete_subscription` | 删除/吊销订阅 token |
 | `get_subscription_config` | 预览订阅配置内容（调试用） |
 
-### 分流规则（4 个）
-| 工具 | 说明 |
-|------|------|
-| `list_rule_sets` | 列出所有流量分类（16 个：openai / netflix / cn / ads 等） |
-| `list_routing_rules` | 列出当前分流绑定 |
-| `set_routing_rule` | 创建/更新分流规则（direct / reject / proxy / 指定节点） |
-| `remove_routing_rule` | 删除分流规则 |
-
 ### 监控（2 个）
 | 工具 | 说明 |
 |------|------|
@@ -146,12 +137,11 @@ src/
 ├── http/
 │   └── index.ts             # HTTP 路由（订阅下载、健康检查）
 ├── mcp/
-│   ├── index.ts             # MCP 服务器工厂（注册全部 24 个工具）
+│   ├── index.ts             # MCP 服务器工厂（注册全部工具）
 │   └── tools/
 │       ├── nodes.ts         # 节点管理工具（5 个）
 │       ├── users.ts         # 用户管理工具（9 个）
 │       ├── subscriptions.ts # 订阅管理工具（4 个）
-│       ├── routing.ts       # 分流规则工具（4 个）
 │       ├── monitoring.ts    # 监控工具（2 个）
 │       └── settings.ts      # 设置工具（3 个）
 └── services/
@@ -164,15 +154,13 @@ src/
     │   ├── sync.ts          # userpass / trafficStats 配置对账
     │   └── stats.ts         # stats API 访问（支持 SSH 隧道）
     ├── settings.ts          # 配置项管理（API key 等）
-    ├── routing/             # 分流规则引擎
-    │   ├── catalog.ts       # 16 个流量分类定义
-    │   ├── index.ts         # 规则 CRUD
-    │   └── resolve.ts       # 规则解析
-    ├── formats/             # 订阅格式渲染器（Format Registry 模式）
-    │   ├── index.ts         # 格式注册表（shadowrocket → surge 别名）
-    │   ├── singbox.ts
-    │   ├── clash.ts
-    │   └── surge.ts
+    ├── formats/             # 订阅格式渲染器（Format Registry 模式，仅输出节点）
+    │   ├── index.ts         # 格式注册表
+    │   ├── proxy.ts         # 共享 ProxyConfig 构建逻辑
+    │   ├── singbox.ts       # sing-box outbounds JSON
+    │   ├── clash.ts         # Clash proxy-provider YAML
+    │   ├── surge.ts         # Surge 外部代理列表
+    │   └── shadowrocket.ts  # Shadowrocket base64 URI 列表
     └── xray/                # Xray/Trojan 节点管理
         └── sync.ts          # 配置文件同步
 ```
@@ -184,7 +172,6 @@ nodes ──┐
         ├── user_nodes（多对多）──┐
 users ──┘                        ├── subscriptions
                                  └── traffic_logs
-routing_rules    # 分流规则（key → action 映射）
 settings         # 配置项（API key 等）
 ```
 
@@ -193,7 +180,6 @@ settings         # 配置项（API key 等）
 - **user_nodes** — 用户与节点的多对多权限关系
 - **subscriptions** — 订阅链接（token + 格式）
 - **traffic_logs** — 历史流量记录
-- **routing_rules** — 分流规则绑定（流量分类 → 动作）
 - **settings** — 系统配置项（API key、token 等，值加密存储）
 
 ### Hysteria2 管理流程
