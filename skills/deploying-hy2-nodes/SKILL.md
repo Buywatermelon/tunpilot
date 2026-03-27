@@ -93,7 +93,6 @@ Using the probe results, build a server profile table:
 Present the server profile and confirm:
 
 - **Congestion control**: Brutal (recommended for dedicated bandwidth) vs BBR (for shared/variable bandwidth)
-- **Port hopping**: Whether to enable UDP port hopping (20000-50000 redirect to 443) for censorship resistance
 - **Bandwidth limits**: Up/down values based on server specs
 - **Masquerade site**: Default `https://www.bing.com/` or custom
 
@@ -270,21 +269,6 @@ fi
 FIREWALL
 ```
 
-**Optional — Port hopping** (if confirmed in Phase 1.5):
-
-```bash
-ssh <server> bash <<'PORTHOP'
-# Redirect range 20000-50000 to 443 for UDP port hopping
-iptables -t nat -A PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports 443
-ip6tables -t nat -A PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports 443
-
-# Persist rules
-apt-get install -y netfilter-persistent iptables-persistent 2>/dev/null \
-  || yum install -y iptables-services 2>/dev/null
-netfilter-persistent save 2>/dev/null || service iptables save 2>/dev/null
-PORTHOP
-```
-
 ### 2.9 Start Service
 
 ```bash
@@ -342,7 +326,6 @@ Present a final report to the user:
 - Protocol and port
 - TLS type (ACME or self-signed)
 - Congestion control and bandwidth limits
-- Port hopping status
 - Kernel tuning applied
 - Health check result
 - Subscription instructions (use `assign_nodes` to grant users access)

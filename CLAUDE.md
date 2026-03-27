@@ -47,5 +47,5 @@ bun run db:push   # 同步 Drizzle schema 到 SQLite
 |------|---------|------|---------|------|
 | **Sing-box** | [src/services/formats/singbox.ts](src/services/formats/singbox.ts) | Hysteria2, Trojan | `application/json` | outbounds JSON 数组，通过 outbound_providers 引用 |
 | **Clash** | [src/services/formats/clash.ts](src/services/formats/clash.ts) | Hysteria2, Trojan | `text/yaml` | proxy-provider 格式（仅 proxies 数组），通过 proxy-providers 引用 |
-| **Surge** | [src/services/formats/surge.ts](src/services/formats/surge.ts) | Hysteria2, Trojan | `text/plain` | 外部代理列表，通过 policy-path 引用，分号分隔 port-hopping |
+| **Surge** | [src/services/formats/surge.ts](src/services/formats/surge.ts) | Hysteria2, Trojan | `text/plain` | 外部代理列表，通过 policy-path 引用 |
 | **Shadowrocket** | [src/services/formats/shadowrocket.ts](src/services/formats/shadowrocket.ts) | Hysteria2, Trojan | `text/plain` (base64) | Base64 编码 URI 列表，hysteria2:// 和 trojan:// 协议 |
