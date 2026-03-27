@@ -21,8 +21,7 @@ function renderProxyLine(p: ProxyConfig, variant: Variant): string {
   if (p.insecure) {
     parts.push("skip-cert-verify=true");
   }
-  if (p.obfs && variant === "shadowrocket") {
-    // Surge 不支持 hy2 salamander obfs，仅 Shadowrocket 支持
+  if (p.obfs) {
     parts.push(`obfs=${p.obfs.type}`, `obfs-password=${p.obfs.password}`);
   }
   if (p.portHopping) {
