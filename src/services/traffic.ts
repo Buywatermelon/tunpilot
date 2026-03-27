@@ -3,6 +3,7 @@ import type { Db } from "../db/index";
 import { nodes, users, trafficLogs, type Node } from "../db/schema";
 import { getXrayClient } from "./xray/pool";
 import { isCallAllowed, recordSuccess, recordFailure } from "../lib/circuit-breaker";
+import { queryHysteriaTraffic } from "./hysteria/stats";
 
 export interface SyncResult {
   nodeId: string;
@@ -128,18 +129,7 @@ async function syncTrafficFromHysteria(db: Db, node: Node): Promise<SyncResult> 
 
   let data: Record<string, { tx: number; rx: number }>;
   try {
-    const res = await fetch(
-      `http://${node.host}:${node.stats_port}/traffic?clear=1`,
-      {
-        headers: { Authorization: node.stats_secret! },
-        signal: AbortSignal.timeout(10_000),
-      },
-    );
-    if (!res.ok) {
-      result.errors.push(`HTTP ${res.status} from node ${node.name}`);
-      return result;
-    }
-    data = await res.json() as Record<string, { tx: number; rx: number }>;
+    data = await queryHysteriaTraffic(node, true);
   } catch (err: any) {
     result.errors.push(`Fetch failed for node ${node.name}: ${err.message}`);
     return result;

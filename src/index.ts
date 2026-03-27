@@ -5,6 +5,7 @@ import { createHttpApp } from "./http/index.ts";
 import { createMcpServer } from "./mcp/index.ts";
 import { startTrafficSync, cleanupOldTrafficLogs } from "./services/traffic.ts";
 import { reconcileAllXrayNodes } from "./services/xray/sync.ts";
+import { reconcileAllHysteriaNodes } from "./services/hysteria/sync.ts";
 import { closeAllXrayClients } from "./services/xray/pool.ts";
 import { closeAllTunnels } from "./services/xray/tunnel.ts";
 import {
@@ -96,9 +97,15 @@ const retentionTimer = setInterval(() => cleanupOldTrafficLogs(db), 24 * 60 * 60
 reconcileAllXrayNodes(db).catch((err) => {
   console.error("Initial Xray reconciliation failed:", err);
 });
+reconcileAllHysteriaNodes(db).catch((err) => {
+  console.error("Initial Hysteria reconciliation failed:", err);
+});
 const xrayReconcileTimer = setInterval(() => {
   reconcileAllXrayNodes(db).catch((err) => {
     console.error("Xray reconciliation failed:", err);
+  });
+  reconcileAllHysteriaNodes(db).catch((err) => {
+    console.error("Hysteria reconciliation failed:", err);
   });
 }, 600_000);
 
@@ -111,7 +118,7 @@ const server = Bun.serve({
 });
 
 console.log(`TunPilot running on ${config.host}:${config.port}`);
-console.log(`  HTTP endpoints: /health, /auth/:nodeId/:authSecret, /sub/:token`);
+console.log(`  HTTP endpoints: /health, /sub/:token`);
 console.log(`  MCP endpoint: /mcp`);
 console.log(`  Traffic sync interval: ${config.trafficSyncInterval / 1000}s`);
 

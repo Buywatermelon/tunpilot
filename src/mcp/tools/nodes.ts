@@ -6,7 +6,7 @@ import { reconcileXrayNode, reconcileAllXrayNodes } from "../../services/xray/sy
 import { getNode } from "../../services/node";
 
 // 注册节点管理工具（4 个）：list_nodes, add_node, update_node, remove_node
-export function register(server: McpServer, db: Db, baseUrl: string) {
+export function register(server: McpServer, db: Db, _baseUrl: string) {
   server.registerTool(
     "list_nodes",
     {
@@ -22,7 +22,7 @@ export function register(server: McpServer, db: Db, baseUrl: string) {
   server.registerTool(
     "add_node",
     {
-      description: "Register a new proxy node (auto-generates auth_secret)",
+      description: "Register a new proxy node",
       inputSchema: {
         name: z.string().describe("Display name"),
         host: z.string().describe("Node address (domain or IP)"),
@@ -45,9 +45,8 @@ export function register(server: McpServer, db: Db, baseUrl: string) {
     },
     async (args) => {
       const node = addNode(db, args);
-      const auth_callback_url = `${baseUrl}/auth/${node.id}/${node.auth_secret}`;
       return {
-        content: [{ type: "text", text: JSON.stringify({ node, auth_callback_url }) }],
+        content: [{ type: "text", text: JSON.stringify({ node }) }],
       };
     }
   );

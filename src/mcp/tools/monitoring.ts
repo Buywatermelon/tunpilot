@@ -6,6 +6,7 @@ import { eq, and, gte, lt, sql } from "drizzle-orm";
 import { trafficLogs } from "../../db/schema";
 import { getXrayClient } from "../../services/xray/pool";
 import { isCallAllowed } from "../../lib/circuit-breaker";
+import { pingHysteriaStats } from "../../services/hysteria/stats";
 
 // 注册监控工具（2 个）：check_health, get_traffic_stats
 export function register(server: McpServer, db: Db, _baseUrl: string) {
@@ -47,15 +48,7 @@ export function register(server: McpServer, db: Db, _baseUrl: string) {
                   return { ...base, status: "online" as const };
                 }
               } else if (node.stats_secret) {
-                // Hysteria2: HTTP stats API ping
-                const res = await fetch(
-                  `http://${node.host}:${node.stats_port}/traffic`,
-                  {
-                    headers: { Authorization: node.stats_secret },
-                    signal: AbortSignal.timeout(5_000),
-                  },
-                );
-                return { ...base, status: res.ok ? "online" as const : `error_${res.status}` };
+                return { ...base, status: await pingHysteriaStats(node) };
               }
             } catch (err: any) {
               console.error(JSON.stringify({

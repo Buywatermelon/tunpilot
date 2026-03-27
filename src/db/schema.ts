@@ -8,7 +8,6 @@ export const nodes = sqliteTable("nodes", {
   host: text("host").notNull(),
   port: integer("port").notNull(),
   protocol: text("protocol").notNull(),
-  auth_secret: text("auth_secret").notNull(),
   stats_port: integer("stats_port"),
   stats_secret: text("stats_secret"),
   sni: text("sni"),

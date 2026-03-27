@@ -13,7 +13,7 @@ afterEach(() => {
 });
 
 describe("addNode", () => {
-  test("插入节点并返回带自动生成 ID 和 auth_secret 的完整记录", () => {
+  test("插入节点并返回完整记录，不再包含 auth_secret", () => {
     const node = addNode(db, {
       name: "tokyo-1",
       host: "203.0.113.1",
@@ -23,8 +23,7 @@ describe("addNode", () => {
 
     expect(node.id).toBeString();
     expect(node.id.length).toBe(36); // UUID 格式
-    expect(node.auth_secret).toBeString();
-    expect(node.auth_secret.length).toBe(64); // 32 字节 = 64 个十六进制字符
+    expect("auth_secret" in node).toBe(false);
     expect(node.name).toBe("tokyo-1");
     expect(node.host).toBe("203.0.113.1");
     expect(node.port).toBe(443);

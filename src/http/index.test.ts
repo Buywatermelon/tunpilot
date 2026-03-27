@@ -23,136 +23,19 @@ function req(path: string, init?: RequestInit) {
   return app.fetch(new Request(`http://localhost${path}`, init));
 }
 
-// --- Auth ---
-
-describe("POST /auth/:nodeId/:authSecret", () => {
-  test("valid auth returns 200 {ok: true, id: username}", async () => {
-    const node = addNode(db, { name: "n1", host: "1.1.1.1", port: 443, protocol: "hysteria2" });
+describe("legacy auth endpoint", () => {
+  test("POST /auth/:nodeId/:authSecret returns 404", async () => {
+    addNode(db, { name: "n1", host: "1.1.1.1", port: 443, protocol: "hysteria2" });
     const user = createUser(db, { name: "alice", password: "pass123" });
-    assignNodesToUser(db, user.id, [node.id]);
+    assignNodesToUser(db, user.id, []);
 
-    const res = await req(`/auth/${node.id}/${node.auth_secret}`, {
+    const res = await req("/auth/legacy-node/legacy-secret", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ addr: "1.2.3.4:12345", auth: "pass123", tx: 0 }),
     });
 
-    expect(res.status).toBe(200);
-    const body = await res.json() as any;
-    expect(body.ok).toBe(true);
-    expect(body.id).toBe("alice");
-  });
-
-  test("wrong password returns 200 {ok: false}", async () => {
-    const node = addNode(db, { name: "n1", host: "1.1.1.1", port: 443, protocol: "hysteria2" });
-
-    const res = await req(`/auth/${node.id}/${node.auth_secret}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ addr: "1.2.3.4:12345", auth: "wrongpass", tx: 0 }),
-    });
-
-    expect(res.status).toBe(200);
-    const body = await res.json() as any;
-    expect(body.ok).toBe(false);
-  });
-
-  test("wrong auth_secret returns 200 {ok: false}", async () => {
-    const node = addNode(db, { name: "n1", host: "1.1.1.1", port: 443, protocol: "hysteria2" });
-    const user = createUser(db, { name: "alice", password: "pass123" });
-    assignNodesToUser(db, user.id, [node.id]);
-
-    const res = await req(`/auth/${node.id}/wrong_secret`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ addr: "1.2.3.4:12345", auth: "pass123", tx: 0 }),
-    });
-
-    expect(res.status).toBe(200);
-    const body = await res.json() as any;
-    expect(body.ok).toBe(false);
-  });
-
-  test("disabled user returns 200 {ok: false}", async () => {
-    const node = addNode(db, { name: "n1", host: "1.1.1.1", port: 443, protocol: "hysteria2" });
-    const user = createUser(db, { name: "alice", password: "pass123" });
-    assignNodesToUser(db, user.id, [node.id]);
-    db.$client.run(`UPDATE users SET enabled = 0 WHERE id = '${user.id}'`);
-
-    const res = await req(`/auth/${node.id}/${node.auth_secret}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ addr: "1.2.3.4:12345", auth: "pass123", tx: 0 }),
-    });
-
-    expect(res.status).toBe(200);
-    const body = await res.json() as any;
-    expect(body.ok).toBe(false);
-  });
-
-  test("expired user returns 200 {ok: false}", async () => {
-    const node = addNode(db, { name: "n1", host: "1.1.1.1", port: 443, protocol: "hysteria2" });
-    const user = createUser(db, {
-      name: "alice",
-      password: "pass123",
-      expires_at: "2020-01-01 00:00:00",
-    });
-    assignNodesToUser(db, user.id, [node.id]);
-
-    const res = await req(`/auth/${node.id}/${node.auth_secret}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ addr: "1.2.3.4:12345", auth: "pass123", tx: 0 }),
-    });
-
-    expect(res.status).toBe(200);
-    const body = await res.json() as any;
-    expect(body.ok).toBe(false);
-  });
-
-  test("over-quota user returns 200 {ok: false}", async () => {
-    const node = addNode(db, { name: "n1", host: "1.1.1.1", port: 443, protocol: "hysteria2" });
-    const user = createUser(db, { name: "alice", password: "pass123", quota_bytes: 1000 });
-    assignNodesToUser(db, user.id, [node.id]);
-    db.$client.run(`UPDATE users SET used_bytes = 1000 WHERE id = '${user.id}'`);
-
-    const res = await req(`/auth/${node.id}/${node.auth_secret}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ addr: "1.2.3.4:12345", auth: "pass123", tx: 0 }),
-    });
-
-    expect(res.status).toBe(200);
-    const body = await res.json() as any;
-    expect(body.ok).toBe(false);
-  });
-
-  test("user without node permission returns 200 {ok: false}", async () => {
-    const node = addNode(db, { name: "n1", host: "1.1.1.1", port: 443, protocol: "hysteria2" });
-    createUser(db, { name: "alice", password: "pass123" });
-    // Not assigned to node
-
-    const res = await req(`/auth/${node.id}/${node.auth_secret}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ addr: "1.2.3.4:12345", auth: "pass123", tx: 0 }),
-    });
-
-    expect(res.status).toBe(200);
-    const body = await res.json() as any;
-    expect(body.ok).toBe(false);
-  });
-
-  test("missing body returns 200 {ok: false}", async () => {
-    const node = addNode(db, { name: "n1", host: "1.1.1.1", port: 443, protocol: "hysteria2" });
-
-    const res = await req(`/auth/${node.id}/${node.auth_secret}`, {
-      method: "POST",
-    });
-
-    expect(res.status).toBe(200);
-    const body = await res.json() as any;
-    expect(body.ok).toBe(false);
+    expect(res.status).toBe(404);
   });
 });
 

@@ -14,7 +14,7 @@ Agent-native 代理节点管理服务。通过 MCP (Model Context Protocol) 提�
 - **流量监控** — 自动从节点同步流量数据，实时配额检查
 - **节点诊断** — 通过 SSH 直连节点执行 IP 质量扫描（风控得分、流媒体解锁）和网络测速（路由、延迟）
 - **分流规则** — 16 个流量分类（OpenAI / Netflix / CN / Ads 等），支持按分类指定 direct / reject / proxy / 指定节点
-- **认证回调** — Hysteria2 节点通过 HTTP 回调验证用户，无需节点侧配置推送
+- **节点侧认证** — Hysteria2 使用原生 `userpass`，TunPilot 通过 SSH 异步下发配置，不处于鉴权热路径
 
 ## 效果演示
 
@@ -87,7 +87,7 @@ Agent 会自动加载 `getting-started` skill，引导完成：
 | 工具 | 说明 |
 |------|------|
 | `list_nodes` | 列出所有节点 |
-| `add_node` | 注册新节点（自动生成 auth_secret，返回认证回调 URL） |
+| `add_node` | 注册新节点（保存 stats / SSH / 订阅所需元数据） |
 | `update_node` | 更新节点配置 |
 | `remove_node` | 删除节点 |
 | `sync_xray_nodes` | 强制同步 Xray/Trojan 节点状态（重启后恢复用） |
@@ -144,7 +144,7 @@ src/
 │   ├── schema.ts            # Drizzle ORM 数据表定义
 │   └── index.ts             # 数据库初始化（WAL 模式 + 外键约束）
 ├── http/
-│   └── index.ts             # HTTP 路由（认证回调、订阅下载、健康检查）
+│   └── index.ts             # HTTP 路由（订阅下载、健康检查）
 ├── mcp/
 │   ├── index.ts             # MCP 服务器工厂（注册全部 24 个工具）
 │   └── tools/
@@ -155,12 +155,14 @@ src/
 │       ├── monitoring.ts    # 监控工具（2 个）
 │       └── settings.ts      # 设置工具（3 个）
 └── services/
-    ├── auth.ts              # 认证逻辑（节点 → 用户 → 权限 四步校验）
-    ├── node.ts              # 节点 CRUD + auth_secret 生成
+    ├── node.ts              # 节点 CRUD
     ├── user.ts              # 用户 CRUD
-    ├── user-ops.ts          # 节点权限分配 + Xray 同步
+    ├── user-ops.ts          # 节点权限分配 + 协议配置同步
     ├── subscription.ts      # 订阅生命周期（生成、列表、删除、token 查询）
     ├── traffic.ts           # 流量同步 + 统计查询
+    ├── hysteria/            # Hysteria2 节点同步与 stats 访问
+    │   ├── sync.ts          # userpass / trafficStats 配置对账
+    │   └── stats.ts         # stats API 访问（支持 SSH 隧道）
     ├── settings.ts          # 配置项管理（API key 等）
     ├── routing/             # 分流规则引擎
     │   ├── catalog.ts       # 16 个流量分类定义
@@ -186,7 +188,7 @@ routing_rules    # 分流规则（key → action 映射）
 settings         # 配置项（API key 等）
 ```
 
-- **nodes** — 代理节点配置（host、port、auth_secret 等）
+- **nodes** — 代理节点配置（host、port、stats、SSH、订阅元数据等）
 - **users** — 用户账号（密码、配额、有效期）
 - **user_nodes** — 用户与节点的多对多权限关系
 - **subscriptions** — 订阅链接（token + 格式）
@@ -194,24 +196,24 @@ settings         # 配置项（API key 等）
 - **routing_rules** — 分流规则绑定（流量分类 → 动作）
 - **settings** — 系统配置项（API key、token 等，值加密存储）
 
-### 认证流程
+### Hysteria2 管理流程
 
 ```
-Hysteria2 客户端 → Hysteria2 节点 → POST /auth/:nodeId/:authSecret → TunPilot
-                                                                        ↓
-                                                          校验节点 → 校验用户 → 校验权限
-                                                                        ↓
-                                                            { ok: true, id: "username" }
+用户/节点变更 → TunPilot → SSH 写入 Hysteria2 config.yaml
+                    ↓
+         auth.type = userpass
+         trafficStats.listen = 127.0.0.1:9999（有 SSH 时）
+                    ↓
+            systemctl reload hysteria-server
 ```
 
-节点通过 URL 路径中的 `authSecret` 验证身份，TunPilot 校验用户密码、启用状态、有效期、流量配额和节点访问权限。
+TunPilot 负责维护节点上的 `userpass` 和 `trafficStats` 配置，但不再参与每次连接鉴权。流量采集优先通过 SSH 隧道访问本地 stats 端口，避免暴露到公网。
 
 ### HTTP 端点
 
 | 端点 | 用途 |
 |------|------|
 | `POST /mcp` | MCP Streamable HTTP（Agent 调用入口） |
-| `POST /auth/:nodeId/:authSecret` | Hysteria2 认证回调（节点 → TunPilot） |
 | `GET /sub/:token` | 订阅配置下载（客户端 → TunPilot） |
 | `GET /health` | 健康检查 |
 

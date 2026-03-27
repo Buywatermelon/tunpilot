@@ -37,7 +37,7 @@ describe("nodes tools", () => {
   beforeEach(setup);
   afterEach(async () => cleanup());
 
-  test("add_node returns node with auth_secret and callback URL", async () => {
+  test("add_node returns node metadata without auth callback details", async () => {
     const result = await client.callTool({
       name: "add_node",
       arguments: {
@@ -48,14 +48,11 @@ describe("nodes tools", () => {
       },
     });
     const data = parseResult(result) as {
-      node: { id: string; auth_secret: string; name: string };
-      auth_callback_url: string;
+      node: { id: string; name: string };
     };
     expect(data.node.name).toBe("tokyo-1");
-    expect(data.node.auth_secret).toHaveLength(64);
-    expect(data.auth_callback_url).toContain(BASE_URL);
-    expect(data.auth_callback_url).toContain(data.node.id);
-    expect(data.auth_callback_url).toContain(data.node.auth_secret);
+    expect("auth_secret" in data.node).toBe(false);
+    expect("auth_callback_url" in data).toBe(false);
   });
 
   test("list_nodes returns all nodes", async () => {

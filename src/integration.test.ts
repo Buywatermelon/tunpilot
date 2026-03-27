@@ -23,124 +23,19 @@ afterEach(() => {
   db.$client.close();
 });
 
-// --- Full Auth Flow ---
+describe("integration: legacy auth endpoint", () => {
+  test("POST /auth/:nodeId/:authSecret is no longer exposed", async () => {
+    addNode(db, { name: "n1", host: "1.1.1.1", port: 443, protocol: "hysteria2" });
+    const user = createUser(db, { name: "alice", password: "pass123" });
+    assignNodesToUser(db, user.id, []);
 
-describe("integration: full auth flow", () => {
-  test("create user + add node + assign + auth succeeds", async () => {
-    // Setup
-    const node = addNode(db, {
-      name: "us-west",
-      host: "198.51.100.1",
-      port: 443,
-      protocol: "hysteria2",
-      sni: "us.example.com",
-    });
-    const user = createUser(db, {
-      name: "alice",
-      password: "s3cure!",
-      quota_bytes: 10737418240, // 10 GB
-    });
-    assignNodesToUser(db, user.id, [node.id]);
-
-    // Auth
-    const res = await req(`/auth/${node.id}/${node.auth_secret}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ addr: "1.2.3.4:54321", auth: "s3cure!", tx: 0 }),
-    });
-
-    expect(res.status).toBe(200);
-    const body = await res.json() as any;
-    expect(body.ok).toBe(true);
-    expect(body.id).toBe("alice");
-  });
-
-  test("multi-node auth: user can access assigned nodes only", async () => {
-    const node1 = addNode(db, { name: "us-1", host: "1.1.1.1", port: 443, protocol: "hysteria2" });
-    const node2 = addNode(db, { name: "jp-1", host: "2.2.2.2", port: 443, protocol: "hysteria2" });
-    const node3 = addNode(db, { name: "eu-1", host: "3.3.3.3", port: 443, protocol: "hysteria2" });
-
-    const user = createUser(db, { name: "bob", password: "mypass" });
-    assignNodesToUser(db, user.id, [node1.id, node2.id]); // not node3
-
-    // Allowed nodes
-    for (const node of [node1, node2]) {
-      const res = await req(`/auth/${node.id}/${node.auth_secret}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ addr: "1.2.3.4:12345", auth: "mypass", tx: 0 }),
-      });
-      const body = await res.json() as any;
-      expect(body.ok).toBe(true);
-    }
-
-    // Disallowed node
-    const res = await req(`/auth/${node3.id}/${node3.auth_secret}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ addr: "1.2.3.4:12345", auth: "mypass", tx: 0 }),
-    });
-    const body = await res.json() as any;
-    expect(body.ok).toBe(false);
-  });
-});
-
-// --- Auth Rejection Cases ---
-
-describe("integration: auth rejection cases", () => {
-  function setupBasicAuth() {
-    const node = addNode(db, { name: "n1", host: "1.1.1.1", port: 443, protocol: "hysteria2" });
-    const user = createUser(db, { name: "alice", password: "pass123", quota_bytes: 1000 });
-    assignNodesToUser(db, user.id, [node.id]);
-    return { node, user };
-  }
-
-  test("disabled user is rejected", async () => {
-    const { node, user } = setupBasicAuth();
-    db.$client.run(`UPDATE users SET enabled = 0 WHERE id = ?`, [user.id]);
-
-    const res = await req(`/auth/${node.id}/${node.auth_secret}`, {
+    const res = await req("/auth/legacy-node/legacy-secret", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ addr: "1.2.3.4:12345", auth: "pass123", tx: 0 }),
     });
-    expect((await res.json() as any).ok).toBe(false);
-  });
 
-  test("expired user is rejected", async () => {
-    const { node, user } = setupBasicAuth();
-    db.$client.run(`UPDATE users SET expires_at = '2020-01-01 00:00:00' WHERE id = ?`, [user.id]);
-
-    const res = await req(`/auth/${node.id}/${node.auth_secret}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ addr: "1.2.3.4:12345", auth: "pass123", tx: 0 }),
-    });
-    expect((await res.json() as any).ok).toBe(false);
-  });
-
-  test("over-quota user is rejected", async () => {
-    const { node, user } = setupBasicAuth();
-    db.$client.run(`UPDATE users SET used_bytes = 1001 WHERE id = ?`, [user.id]);
-
-    const res = await req(`/auth/${node.id}/${node.auth_secret}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ addr: "1.2.3.4:12345", auth: "pass123", tx: 0 }),
-    });
-    expect((await res.json() as any).ok).toBe(false);
-  });
-
-  test("disabled node is rejected", async () => {
-    const { node, user } = setupBasicAuth();
-    db.$client.run(`UPDATE nodes SET enabled = 0 WHERE id = ?`, [node.id]);
-
-    const res = await req(`/auth/${node.id}/${node.auth_secret}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ addr: "1.2.3.4:12345", auth: "pass123", tx: 0 }),
-    });
-    expect((await res.json() as any).ok).toBe(false);
+    expect(res.status).toBe(404);
   });
 });
 

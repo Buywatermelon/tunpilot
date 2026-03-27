@@ -217,7 +217,7 @@ describe("渲染集成", () => {
     addCustomRule(db, { type: "domain", value: "blocked.com", action: "reject" });
 
     const user = { id: "u1", name: "test", password: "pass", quota_bytes: 0, used_bytes: 0, expires_at: null, max_devices: 3, enabled: 1, created_at: null };
-    const nodes = [{ id: "n1", name: "US-Node", host: "1.2.3.4", port: 443, protocol: "hysteria2", auth_secret: "s", sni: null, cert_fingerprint: null, stats_port: null, stats_secret: null, cert_path: null, cert_expires: null, hy2_version: null, config_path: null, ssh_user: null, ssh_port: null, ssh_alias: null, insecure: 0, enabled: 1, created_at: null }];
+    const nodes = [{ id: "n1", name: "US-Node", host: "1.2.3.4", port: 443, protocol: "hysteria2", sni: null, cert_fingerprint: null, stats_port: null, stats_secret: null, cert_path: null, cert_expires: null, hy2_version: null, config_path: null, ssh_user: null, ssh_port: null, ssh_alias: null, insecure: 0, obfs_password: null, enabled: 1, created_at: null }];
     const customRules = getActiveCustomRules(db);
 
     const config = surge.render(user, nodes, { customRules });
@@ -235,7 +235,7 @@ describe("渲染集成", () => {
     addCustomRule(db, { type: "ip_cidr", value: "10.0.0.0/8", action: "direct" });
 
     const user = { id: "u1", name: "test", password: "pass", quota_bytes: 0, used_bytes: 0, expires_at: null, max_devices: 3, enabled: 1, created_at: null };
-    const nodes = [{ id: "n1", name: "US-Node", host: "1.2.3.4", port: 443, protocol: "hysteria2", auth_secret: "s", sni: null, cert_fingerprint: null, stats_port: null, stats_secret: null, cert_path: null, cert_expires: null, hy2_version: null, config_path: null, ssh_user: null, ssh_port: null, ssh_alias: null, insecure: 0, enabled: 1, created_at: null }];
+    const nodes = [{ id: "n1", name: "US-Node", host: "1.2.3.4", port: 443, protocol: "hysteria2", sni: null, cert_fingerprint: null, stats_port: null, stats_secret: null, cert_path: null, cert_expires: null, hy2_version: null, config_path: null, ssh_user: null, ssh_port: null, ssh_alias: null, insecure: 0, obfs_password: null, enabled: 1, created_at: null }];
     const customRules = getActiveCustomRules(db);
 
     const config = clash.render(user, nodes, { customRules });
@@ -250,7 +250,7 @@ describe("渲染集成", () => {
     addCustomRule(db, { type: "domain_keyword", value: "tracking", action: "reject" });
 
     const user = { id: "u1", name: "test", password: "pass", quota_bytes: 0, used_bytes: 0, expires_at: null, max_devices: 3, enabled: 1, created_at: null };
-    const nodes = [{ id: "n1", name: "US-Node", host: "1.2.3.4", port: 443, protocol: "hysteria2", auth_secret: "s", sni: null, cert_fingerprint: null, stats_port: null, stats_secret: null, cert_path: null, cert_expires: null, hy2_version: null, config_path: null, ssh_user: null, ssh_port: null, ssh_alias: null, insecure: 0, enabled: 1, created_at: null }];
+    const nodes = [{ id: "n1", name: "US-Node", host: "1.2.3.4", port: 443, protocol: "hysteria2", sni: null, cert_fingerprint: null, stats_port: null, stats_secret: null, cert_path: null, cert_expires: null, hy2_version: null, config_path: null, ssh_user: null, ssh_port: null, ssh_alias: null, insecure: 0, obfs_password: null, enabled: 1, created_at: null }];
     const customRules = getActiveCustomRules(db);
 
     const config = JSON.parse(singbox.render(user, nodes, { customRules }));

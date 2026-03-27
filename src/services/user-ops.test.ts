@@ -57,6 +57,19 @@ function createTrojanNode(): Node {
   });
 }
 
+function createHy2Node(): Node {
+  return addNode(db, {
+    name: "hy2-us",
+    host: "203.0.113.2",
+    port: 443,
+    protocol: "hysteria2",
+    stats_port: 9999,
+    stats_secret: "stats-secret",
+    ssh_user: "root",
+    config_path: "/etc/hysteria/config.yaml",
+  });
+}
+
 function createTestUser(): User {
   return createUser(db, { name: "testuser", password: "testpass" });
 }
@@ -92,6 +105,36 @@ describe("updateUserWithSync", () => {
     expect(mockSshWriteFile).toHaveBeenCalled();
     const config = JSON.parse(mockSshWriteFile.mock.calls[0]![2] as string);
     expect(config.inbounds[0].settings.clients).toHaveLength(0);
+  });
+
+  test("更新密码时也同步 Hysteria2 userpass 配置", async () => {
+    const node = createHy2Node();
+    const user = createTestUser();
+    assignNodesToUser(db, user.id, [node.id]);
+
+    mockSshExec.mockImplementation(async (_node: Node, cmd: string) => {
+      if (cmd.startsWith("cat ")) {
+        return [
+          "listen: :443",
+          "auth:",
+          "  type: http",
+          "trafficStats:",
+          "  listen: :9091",
+          "  secret: old-secret",
+          "",
+        ].join("\n");
+      }
+      return "";
+    });
+
+    await updateUserWithSync(db, user.id, { password: "newpass" });
+
+    expect(mockSshWriteFile).toHaveBeenCalled();
+    const written = mockSshWriteFile.mock.calls[0]![2] as string;
+    expect(written).toContain("type: userpass");
+    expect(written).toContain("testuser: newpass");
+    expect(written).toContain("listen: 127.0.0.1:9999");
+    expect(written).toContain("secret: stats-secret");
   });
 
   test("更新 quota 时不触发同步", async () => {

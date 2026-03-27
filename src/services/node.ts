@@ -4,24 +4,14 @@ import { nodes, type Node, type NewNode } from "../db/schema";
 
 // 添加节点参数
 export type AddNodeParams = Pick<NewNode, "name" | "host" | "port" | "protocol"> &
-  Partial<Pick<NewNode, "stats_port" | "stats_secret" | "sni" | "cert_path" | "cert_expires" | "hy2_version" | "config_path" | "ssh_user" | "ssh_port" | "ssh_alias" | "cert_fingerprint" | "insecure" | "enabled">>;
+  Partial<Pick<NewNode, "stats_port" | "stats_secret" | "sni" | "cert_path" | "cert_expires" | "hy2_version" | "config_path" | "ssh_user" | "ssh_port" | "ssh_alias" | "cert_fingerprint" | "insecure" | "obfs_password" | "enabled">>;
 
 // 更新节点参数（排除不可修改字段）
-export type UpdateNodeParams = Partial<Omit<Node, "id" | "auth_secret" | "created_at">>;
+export type UpdateNodeParams = Partial<Omit<Node, "id" | "created_at">>;
 
-// 生成 32 字节随机十六进制字符串
-function generateAuthSecret(): string {
-  const bytes = new Uint8Array(32);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-// 添加节点（自动生成 auth_secret）
+// 添加节点
 export function addNode(db: Db, params: AddNodeParams): Node {
-  return db.insert(nodes).values({
-    ...params,
-    auth_secret: generateAuthSecret(),
-  }).returning().get();
+  return db.insert(nodes).values(params).returning().get();
 }
 
 // 列出所有节点

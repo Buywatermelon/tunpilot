@@ -176,7 +176,7 @@ describe("user service", () => {
       const user = createUser(db, { name: "alice", password: "p1" });
       // 手动插入节点以建立关联
       db.$client.run(
-        "INSERT INTO nodes (id, name, host, port, protocol, auth_secret) VALUES ('n1', 'US', 'host', 443, 'hysteria2', 'secret')"
+        "INSERT INTO nodes (id, name, host, port, protocol) VALUES ('n1', 'US', 'host', 443, 'hysteria2')"
       );
       db.$client.run(
         `INSERT INTO user_nodes (user_id, node_id) VALUES ('${user.id}', 'n1')`
@@ -213,7 +213,7 @@ describe("user service", () => {
   describe("assignNodesToUser", () => {
     function insertNode(id: string) {
       db.$client.run(
-        `INSERT INTO nodes (id, name, host, port, protocol, auth_secret) VALUES ('${id}', 'Node ${id}', 'host', 443, 'hysteria2', 'secret')`
+        `INSERT INTO nodes (id, name, host, port, protocol) VALUES ('${id}', 'Node ${id}', 'host', 443, 'hysteria2')`
       );
     }
 
@@ -258,7 +258,7 @@ describe("user service", () => {
   describe("getUserNodes", () => {
     function insertNode(id: string, name: string) {
       db.$client.run(
-        `INSERT INTO nodes (id, name, host, port, protocol, auth_secret) VALUES ('${id}', '${name}', 'host', 443, 'hysteria2', 'secret')`
+        `INSERT INTO nodes (id, name, host, port, protocol) VALUES ('${id}', '${name}', 'host', 443, 'hysteria2')`
       );
     }
 
