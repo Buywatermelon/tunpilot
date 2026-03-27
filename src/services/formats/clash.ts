@@ -3,6 +3,7 @@ import type { SubscriptionFormat, RenderMeta } from "./index";
 import { RULE_SET_CATALOG } from "../routing/catalog";
 import { resolveAllRules } from "../routing/resolve";
 import { renderSurgeStyleRules } from "./custom-rule-utils";
+import { buildProxyConfig, mapOutbound } from "./proxy";
 
 export const clash: SubscriptionFormat = {
   name: "clash",
@@ -15,27 +16,24 @@ export const clash: SubscriptionFormat = {
 
     const proxies = nodes
       .map((n) => {
-        const sni = n.sni || n.host;
-        const type = n.protocol === "trojan" ? "trojan" : "hysteria2";
-        // Hysteria2 userpass auth requires username:password format
-        const password = n.protocol === "hysteria2" ? `${user.name}:${user.password}` : user.password;
-        let entry = `  - name: "${n.name}"
-    type: ${type}
-    server: ${n.host}
-    port: ${n.port}
-    password: "${password}"
-    sni: ${sni}`;
-        if (n.cert_fingerprint && n.protocol === "trojan") {
-          entry += `\n    fingerprint: ${n.cert_fingerprint}`;
+        const p = buildProxyConfig(n, user);
+        let entry = `  - name: "${p.name}"
+    type: ${p.protocol}
+    server: ${p.server}
+    port: ${p.port}
+    password: "${p.password}"
+    sni: ${p.sni}`;
+        if (p.certFingerprint) {
+          entry += `\n    fingerprint: ${p.certFingerprint}`;
         }
-        if (n.insecure) {
+        if (p.insecure) {
           entry += `\n    skip-cert-verify: true`;
         }
-        if (n.obfs_password && n.protocol !== "trojan") {
-          entry += `\n    obfs: salamander\n    obfs-password: "${n.obfs_password}"`;
+        if (p.obfs) {
+          entry += `\n    obfs: ${p.obfs.type}\n    obfs-password: "${p.obfs.password}"`;
         }
-        if (n.port_hopping && n.protocol !== "trojan") {
-          entry += `\n    ports: "${n.port_hopping}"\n    hop-interval: 30`;
+        if (p.portHopping) {
+          entry += `\n    ports: "${p.portHopping}"\n    hop-interval: 30`;
         }
         return entry;
       })
@@ -69,13 +67,7 @@ export const clash: SubscriptionFormat = {
         continue;
       }
 
-      const clashOutbound = outbound === "direct"
-        ? "DIRECT"
-        : outbound === "reject"
-          ? "REJECT"
-          : outbound === "proxy"
-            ? "Proxy"
-            : outbound;
+      const clashOutbound = mapOutbound(outbound);
 
       if (!catalog.clash) continue;
 

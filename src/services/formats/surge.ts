@@ -3,28 +3,27 @@ import type { SubscriptionFormat, RenderMeta } from "./index";
 import { RULE_SET_CATALOG } from "../routing/catalog";
 import { resolveAllRules } from "../routing/resolve";
 import { renderSurgeStyleRules } from "./custom-rule-utils";
+import { buildProxyConfig, mapOutbound, type ProxyConfig } from "./proxy";
 
-function renderProxyLine(node: Node, password: string): string {
-  const sni = node.sni || node.host;
-  const type = node.protocol === "trojan" ? "trojan" : "hysteria2";
+function renderProxyLine(p: ProxyConfig): string {
   const parts = [
-    `${node.name} = ${type}`,
-    node.host,
-    String(node.port),
-    `password=${password}`,
-    `sni=${sni}`,
+    `${p.name} = ${p.protocol}`,
+    p.server,
+    String(p.port),
+    `password=${p.password}`,
+    `sni=${p.sni}`,
   ];
-  if (node.cert_fingerprint && node.protocol === "trojan") {
-    parts.push(`server-cert-fingerprint-sha256=${node.cert_fingerprint}`);
+  if (p.certFingerprint) {
+    parts.push(`server-cert-fingerprint-sha256=${p.certFingerprint}`);
   }
-  if (node.insecure === 1) {
+  if (p.insecure) {
     parts.push("skip-cert-verify=true");
   }
-  if (node.obfs_password && node.protocol !== "trojan") {
-    parts.push(`obfs=salamander`, `obfs-password=${node.obfs_password}`);
+  if (p.obfs) {
+    parts.push(`obfs=${p.obfs.type}`, `obfs-password=${p.obfs.password}`);
   }
-  if (node.port_hopping && node.protocol !== "trojan") {
-    parts.push(`port-hopping=${node.port_hopping}`, `port-hopping-interval=30`);
+  if (p.portHopping) {
+    parts.push(`port-hopping=${p.portHopping}`, `port-hopping-interval=30`);
   }
   return parts.join(", ");
 }
@@ -86,9 +85,7 @@ export const surge: SubscriptionFormat = {
     lines.push("[Proxy]");
     lines.push("DIRECT = direct");
     for (const node of nodes) {
-      // Hysteria2 userpass auth requires username:password format
-      const credential = node.protocol === "hysteria2" ? `${user.name}:${user.password}` : user.password;
-      lines.push(renderProxyLine(node, credential));
+      lines.push(renderProxyLine(buildProxyConfig(node, user)));
     }
     lines.push("");
 
@@ -111,13 +108,7 @@ export const surge: SubscriptionFormat = {
       const catalog = RULE_SET_CATALOG[rule.rule_set_key];
       if (!catalog) continue;
 
-      const surgeOutbound = outbound === "direct"
-        ? "DIRECT"
-        : outbound === "reject"
-          ? "REJECT"
-          : outbound === "proxy"
-            ? "Proxy"
-            : outbound;
+      const surgeOutbound = mapOutbound(outbound);
 
       // 兜底
       if ("type" in catalog.singbox && catalog.singbox.type === "final") {

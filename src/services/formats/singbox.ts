@@ -7,6 +7,7 @@ import {
 } from "../routing/catalog";
 import { resolveAllRules } from "../routing/resolve";
 import type { CustomRule } from "../../db/schema";
+import { buildProxyConfig } from "./proxy";
 
 // 将自定义规则转为 sing-box route rule 对象
 function renderCustomRules(rules: CustomRule[]): Record<string, unknown>[] {
@@ -71,23 +72,23 @@ export const singbox: SubscriptionFormat = {
     const resolved = resolveAllRules(routingRules, nodes, allNodes);
 
     const proxyOutbounds = nodes.map((n) => {
+      const p = buildProxyConfig(n, user);
       const tls: Record<string, unknown> = {
         enabled: true,
-        server_name: n.sni || n.host,
+        server_name: p.sni,
       };
-      if (n.insecure) {
+      if (p.insecure) {
         tls.insecure = true;
       }
-      if (n.protocol === "trojan") {
-        return { type: "trojan" as const, tag: n.name, server: n.host, server_port: n.port, password: user.password, tls };
+      if (p.protocol === "trojan") {
+        return { type: "trojan" as const, tag: p.name, server: p.server, server_port: p.port, password: p.password, tls };
       }
-      // Hysteria2 userpass auth requires username:password format
-      const hy2: Record<string, unknown> = { type: "hysteria2" as const, tag: n.name, server: n.host, server_port: n.port, password: `${user.name}:${user.password}`, tls };
-      if (n.obfs_password) {
-        hy2.obfs = { type: "salamander", password: n.obfs_password };
+      const hy2: Record<string, unknown> = { type: "hysteria2" as const, tag: p.name, server: p.server, server_port: p.port, password: p.password, tls };
+      if (p.obfs) {
+        hy2.obfs = { type: p.obfs.type, password: p.obfs.password };
       }
-      if (n.port_hopping) {
-        hy2.hop_ports = n.port_hopping;
+      if (p.portHopping) {
+        hy2.hop_ports = p.portHopping;
         hy2.hop_interval = "30s";
       }
       return hy2;
