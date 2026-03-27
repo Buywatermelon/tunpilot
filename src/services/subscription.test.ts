@@ -151,7 +151,7 @@ describe("订阅服务", () => {
       expect(hy2Outbounds[0].tag).toBe("BWG-US");
       expect(hy2Outbounds[0].server).toBe("us-node.example.com");
       expect(hy2Outbounds[0].server_port).toBe(443);
-      expect(hy2Outbounds[0].password).toBe("secret123");
+      expect(hy2Outbounds[0].password).toBe("alice:secret123");
       expect(hy2Outbounds[0].tls.server_name).toBe("us-node.example.com");
     });
 
@@ -181,7 +181,7 @@ describe("订阅服务", () => {
       expect(yaml).toContain('name: "BWG-US"');
       expect(yaml).toContain("server: us-node.example.com");
       expect(yaml).toContain("port: 443");
-      expect(yaml).toContain('password: "secret123"');
+      expect(yaml).toContain('password: "alice:secret123"');
       expect(yaml).toContain("sni: us-node.example.com");
     });
 
@@ -213,8 +213,8 @@ describe("订阅服务", () => {
       expect(conf).toContain("[Proxy]");
       expect(conf).toContain("[Proxy Group]");
       expect(conf).toContain("[Rule]");
-      expect(conf).toContain("BWG-US = hysteria2, us-node.example.com, 443, password=secret123");
-      expect(conf).toContain("IIJ-JP = hysteria2, jp-node.example.com, 443, password=secret123");
+      expect(conf).toContain("BWG-US = hysteria2, us-node.example.com, 443, password=alice:secret123");
+      expect(conf).toContain("IIJ-JP = hysteria2, jp-node.example.com, 443, password=alice:secret123");
     });
 
     test("包含 MANAGED-CONFIG 头（当提供 subscriptionUrl 时）", () => {

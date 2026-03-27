@@ -71,7 +71,7 @@ describe("integration: subscription flow", () => {
     expect(srRes.status).toBe(200);
     const srText = await srRes.text();
     expect(srText).toContain("[Proxy]");
-    expect(srText).toContain("mypassword");
+    expect(srText).toContain("carol:mypassword");
     expect(srText).toContain("US West");
     expect(srText).toContain("JP Tokyo");
 
@@ -82,7 +82,7 @@ describe("integration: subscription flow", () => {
     expect(sbJson.outbounds).toBeDefined();
     const hy2Outbounds = sbJson.outbounds.filter((o: any) => o.type === "hysteria2");
     expect(hy2Outbounds).toHaveLength(2);
-    expect(hy2Outbounds[0].password).toBe("mypassword");
+    expect(hy2Outbounds[0].password).toBe("carol:mypassword");
 
     // Clash: YAML with proxies
     const clRes = await req(`/sub/${clSub.token}`);
@@ -91,7 +91,7 @@ describe("integration: subscription flow", () => {
     expect(clText).toContain("proxies:");
     expect(clText).toContain("US West");
     expect(clText).toContain("JP Tokyo");
-    expect(clText).toContain("mypassword");
+    expect(clText).toContain("carol:mypassword");
   });
 
   test("subscription only includes enabled nodes", async () => {

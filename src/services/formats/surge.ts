@@ -83,7 +83,9 @@ export const surge: SubscriptionFormat = {
     lines.push("[Proxy]");
     lines.push("DIRECT = direct");
     for (const node of nodes) {
-      lines.push(renderProxyLine(node, user.password));
+      // Hysteria2 userpass auth requires username:password format
+      const credential = node.protocol === "hysteria2" ? `${user.name}:${user.password}` : user.password;
+      lines.push(renderProxyLine(node, credential));
     }
     lines.push("");
 

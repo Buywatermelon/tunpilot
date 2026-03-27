@@ -17,11 +17,13 @@ export const clash: SubscriptionFormat = {
       .map((n) => {
         const sni = n.sni || n.host;
         const type = n.protocol === "trojan" ? "trojan" : "hysteria2";
+        // Hysteria2 userpass auth requires username:password format
+        const password = n.protocol === "hysteria2" ? `${user.name}:${user.password}` : user.password;
         let entry = `  - name: "${n.name}"
     type: ${type}
     server: ${n.host}
     port: ${n.port}
-    password: "${user.password}"
+    password: "${password}"
     sni: ${sni}`;
         if (n.cert_fingerprint && n.protocol === "trojan") {
           entry += `\n    fingerprint: ${n.cert_fingerprint}`;
