@@ -36,10 +36,9 @@ export function getAllFormatNames(): string[] {
 
 import { singbox } from "./singbox";
 import { clash } from "./clash";
-import { surge } from "./surge";
+import { surge, shadowrocket } from "./surge";
 
 registerFormat(singbox);
 registerFormat(clash);
 registerFormat(surge);
-// shadowrocket → surge 别名（小火箭完全兼容 Surge 配置）
-registry.set("shadowrocket", surge);
+registerFormat(shadowrocket);

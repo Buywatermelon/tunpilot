@@ -5,7 +5,9 @@ import { resolveAllRules } from "../routing/resolve";
 import { renderSurgeStyleRules } from "./custom-rule-utils";
 import { buildProxyConfig, mapOutbound, type ProxyConfig } from "./proxy";
 
-function renderProxyLine(p: ProxyConfig): string {
+type Variant = "surge" | "shadowrocket";
+
+function renderProxyLine(p: ProxyConfig, variant: Variant): string {
   const parts = [
     `${p.name} = ${p.protocol}`,
     p.server,
@@ -19,19 +21,26 @@ function renderProxyLine(p: ProxyConfig): string {
   if (p.insecure) {
     parts.push("skip-cert-verify=true");
   }
-  if (p.obfs) {
+  if (p.obfs && variant === "shadowrocket") {
+    // Surge 不支持 hy2 salamander obfs，仅 Shadowrocket 支持
     parts.push(`obfs=${p.obfs.type}`, `obfs-password=${p.obfs.password}`);
   }
   if (p.portHopping) {
-    parts.push(`ports=${p.portHopping}`, `hop-interval=30`);
+    if (variant === "surge") {
+      // Surge 官方语法：分号分隔端口范围
+      parts.push(`port-hopping=${p.portHopping.replace(/,/g, ";")}`, `port-hopping-interval=30`);
+    } else {
+      parts.push(`ports=${p.portHopping}`, `hop-interval=30`);
+    }
   }
   return parts.join(", ");
 }
 
-export const surge: SubscriptionFormat = {
-  name: "surge",
-  contentType: "text/plain; charset=utf-8",
-  render(user: User, nodes: Node[], meta?: RenderMeta): string {
+function createRenderer(variant: Variant): SubscriptionFormat {
+  return {
+    name: variant,
+    contentType: "text/plain; charset=utf-8",
+    render(user: User, nodes: Node[], meta?: RenderMeta): string {
     const routingRules = meta?.routingRules ?? [];
     const allNodes = meta?.allNodes ?? nodes;
     const resolved = resolveAllRules(routingRules, nodes, allNodes);
@@ -85,7 +94,7 @@ export const surge: SubscriptionFormat = {
     lines.push("[Proxy]");
     lines.push("DIRECT = direct");
     for (const node of nodes) {
-      lines.push(renderProxyLine(buildProxyConfig(node, user)));
+      lines.push(renderProxyLine(buildProxyConfig(node, user), variant));
     }
     lines.push("");
 
@@ -138,3 +147,7 @@ export const surge: SubscriptionFormat = {
     return lines.join("\n");
   },
 };
+}
+
+export const surge = createRenderer("surge");
+export const shadowrocket = createRenderer("shadowrocket");
