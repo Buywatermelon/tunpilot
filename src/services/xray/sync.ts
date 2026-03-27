@@ -78,7 +78,7 @@ export async function deployNodeUsers(db: Db, node: Node): Promise<ReconcileResu
 
       trojanInbound.settings.clients = desiredClients;
       await sshWriteFile(node, configPath, JSON.stringify(config, null, 2));
-      await sshExec(node, "systemctl restart xray");
+      await sshExec(node, "sudo systemctl restart xray");
 
       result.added = desiredClients.length;
       recordSuccess(circuitKey);

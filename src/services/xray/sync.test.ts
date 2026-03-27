@@ -93,7 +93,7 @@ describe("syncUserToXrayNodes", () => {
     expect(clients[0].email).toBe(user.name);
     expect(clients[0].password).toBe(user.password);
     // Should restart xray
-    expect(mockSshExec).toHaveBeenCalledWith(expect.anything(), "systemctl restart xray");
+    expect(mockSshExec).toHaveBeenCalledWith(expect.anything(), "sudo systemctl restart xray");
   });
 
   test("不对 Hysteria2 节点进行操作", async () => {

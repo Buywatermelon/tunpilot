@@ -26,10 +26,12 @@ const DEFAULT_CONFIG_PATHS = [
 ];
 
 const HYSTERIA_RELOAD_COMMAND = [
-  "systemctl reload hysteria-server",
-  "systemctl restart hysteria-server",
-  "systemctl reload hysteria",
-  "systemctl restart hysteria",
+  "sudo systemctl reload hysteria-server",
+  "sudo systemctl restart hysteria-server",
+  "sudo systemctl reload hysteria2",
+  "sudo systemctl restart hysteria2",
+  "sudo systemctl reload hysteria",
+  "sudo systemctl restart hysteria",
 ].join(" || ");
 
 interface HysteriaConfig {
