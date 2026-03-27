@@ -93,6 +93,30 @@ describe("GET /sub/:token", () => {
   });
 });
 
+// --- Config Proxy ---
+
+describe("GET /config/:token", () => {
+  test("returns 500 when gist url not configured", async () => {
+    const node = addNode(db, {
+      name: "test-node",
+      host: "1.2.3.4",
+      port: 443,
+      protocol: "hysteria2",
+      sni: "test.example.com",
+    });
+    const user = createUser(db, { name: "alice", password: "pass" });
+    assignNodesToUser(db, user.id, [node.id]);
+    const sub = generateSubscription(db, user.id, "surge");
+    const res = await req(`/config/${sub.token}`);
+    expect(res.status).toBe(500);
+  });
+
+  test("invalid token returns 404", async () => {
+    const res = await req("/config/nonexistent-token");
+    expect(res.status).toBe(404);
+  });
+});
+
 // --- Health ---
 
 describe("GET /health", () => {
