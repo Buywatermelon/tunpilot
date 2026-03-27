@@ -23,7 +23,7 @@ function renderProxyLine(p: ProxyConfig): string {
     parts.push(`obfs=${p.obfs.type}`, `obfs-password=${p.obfs.password}`);
   }
   if (p.portHopping) {
-    parts.push(`port-hopping=${p.portHopping}`, `port-hopping-interval=30`);
+    parts.push(`ports=${p.portHopping}`, `hop-interval=30`);
   }
   return parts.join(", ");
 }
