@@ -21,7 +21,6 @@ function makeNode(overrides: Partial<Node> = {}): Node {
     ssh_alias: null,
     cert_fingerprint: null,
     insecure: 0,
-    obfs_password: null,
     enabled: 1,
     created_at: new Date().toISOString(),
     ...overrides,

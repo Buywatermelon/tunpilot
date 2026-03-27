@@ -23,9 +23,6 @@ function renderProxyLine(p: ProxyConfig): string {
   if (p.insecure) {
     parts.push("skip-cert-verify=true");
   }
-  if (p.obfs) {
-    parts.push(`obfs=${p.obfs.type}`, `obfs-password=${p.obfs.password}`);
-  }
   if (p.portHopping) {
     parts.push(`port-hopping=${p.portHopping.replace(/,/g, ";")}`, `port-hopping-interval=30`);
   }

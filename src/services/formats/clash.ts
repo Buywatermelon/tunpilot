@@ -26,9 +26,6 @@ export const clash: SubscriptionFormat = {
         if (p.insecure) {
           entry += `\n    skip-cert-verify: true`;
         }
-        if (p.obfs) {
-          entry += `\n    obfs: ${p.obfs.type}\n    obfs-password: "${p.obfs.password}"`;
-        }
         if (p.portHopping) {
           entry += `\n    ports: "${p.portHopping}"\n    hop-interval: 30`;
         }

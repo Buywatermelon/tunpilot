@@ -23,7 +23,6 @@ function makeNode(overrides: Partial<Node> = {}): Node {
     insecure: 0,
     enabled: 1,
     created_at: new Date().toISOString(),
-    obfs_password: null,
     ...overrides,
   };
 }

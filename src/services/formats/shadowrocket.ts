@@ -5,7 +5,6 @@ import { buildProxyConfig, type ProxyConfig } from "./proxy";
 /**
  * Shadowrocket 原生订阅格式：base64 编码的 URI 列表。
  * 每个节点一行 URI（hysteria2://、trojan:// 等），整体 base64 编码。
- * 这比 Surge 配置格式更可靠地传递 hy2 obfs 等参数。
  */
 
 function buildUri(p: ProxyConfig): string {
@@ -13,10 +12,6 @@ function buildUri(p: ProxyConfig): string {
     const params = new URLSearchParams();
     params.set("peer", p.sni);
     if (p.insecure) params.set("insecure", "1");
-    if (p.obfs) {
-      params.set("obfs", p.obfs.type);
-      params.set("obfs-password", p.obfs.password);
-    }
     if (p.portHopping) {
       params.set("mport", p.portHopping);
     }

@@ -28,7 +28,6 @@ export function initDatabase(path: string): Db {
       ssh_alias     TEXT,
       cert_fingerprint TEXT,
       insecure      INTEGER DEFAULT 0,
-      obfs_password TEXT,
       port_hopping  TEXT,
       enabled       INTEGER DEFAULT 1,
       created_at    TEXT DEFAULT (datetime('now'))

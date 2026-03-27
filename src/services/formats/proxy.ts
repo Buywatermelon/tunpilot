@@ -9,7 +9,6 @@ export interface ProxyConfig {
   sni: string;
   insecure: boolean;
   certFingerprint?: string;
-  obfs?: { type: "salamander"; password: string };
   portHopping?: string;
 }
 
@@ -28,10 +27,6 @@ export function buildProxyConfig(node: Node, user: User): ProxyConfig {
 
   if (node.cert_fingerprint && node.protocol === "trojan") {
     config.certFingerprint = node.cert_fingerprint;
-  }
-
-  if (node.obfs_password && node.protocol !== "trojan") {
-    config.obfs = { type: "salamander", password: node.obfs_password };
   }
 
   if (node.port_hopping && node.protocol !== "trojan") {

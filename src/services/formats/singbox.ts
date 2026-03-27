@@ -24,9 +24,6 @@ export const singbox: SubscriptionFormat = {
         return { type: "trojan" as const, tag: p.name, server: p.server, server_port: p.port, password: p.password, tls };
       }
       const hy2: Record<string, unknown> = { type: "hysteria2" as const, tag: p.name, server: p.server, server_port: p.port, password: p.password, tls };
-      if (p.obfs) {
-        hy2.obfs = { type: p.obfs.type, password: p.obfs.password };
-      }
       if (p.portHopping) {
         hy2.hop_ports = p.portHopping;
         hy2.hop_interval = "30s";
