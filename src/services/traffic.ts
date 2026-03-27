@@ -26,7 +26,49 @@ export interface TrafficStat {
   recordedAt: string;
 }
 
-// 从 Xray 节点同步流量数据（gRPC）
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+/** Write a batch of per-user traffic data to DB within a transaction. */
+function writeTrafficBatch(
+  db: Db,
+  nodeId: string,
+  data: Iterable<[string, { tx: number; rx: number }]>,
+  result: SyncResult,
+): void {
+  db.$client.run("BEGIN");
+
+  for (const [username, traffic] of data) {
+    const totalBytes = traffic.tx + traffic.rx;
+    if (totalBytes === 0) continue;
+
+    const user = db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.name, username))
+      .get();
+
+    if (!user) {
+      result.errors.push(`Unknown user: ${username}`);
+      continue;
+    }
+
+    db.insert(trafficLogs)
+      .values({ user_id: user.id, node_id: nodeId, tx_bytes: traffic.tx, rx_bytes: traffic.rx })
+      .run();
+
+    db.update(users)
+      .set({ used_bytes: sql`used_bytes + ${totalBytes}` })
+      .where(eq(users.id, user.id))
+      .run();
+
+    result.synced++;
+  }
+
+  db.$client.run("COMMIT");
+}
+
 async function syncTrafficFromXrayNode(db: Db, node: Node): Promise<SyncResult> {
   const result: SyncResult = { nodeId: node.id, synced: 0, errors: [] };
 
@@ -39,63 +81,47 @@ async function syncTrafficFromXrayNode(db: Db, node: Node): Promise<SyncResult> 
   let data: Map<string, { tx: number; rx: number }>;
   try {
     data = await client.queryTraffic(true);
-  } catch (err: any) {
-    result.errors.push(`gRPC query failed for node ${node.name}: ${err.message}`);
+  } catch (err: unknown) {
+    result.errors.push(`gRPC query failed for node ${node.name}: ${errorMessage(err)}`);
     return result;
   }
 
   if (data.size === 0) return result;
 
   try {
-    db.$client.run("BEGIN");
-
-    for (const [username, traffic] of data) {
-      const totalBytes = traffic.tx + traffic.rx;
-      if (totalBytes === 0) continue;
-
-      const user = db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.name, username))
-        .get();
-
-      if (!user) {
-        result.errors.push(`Unknown user: ${username}`);
-        continue;
-      }
-
-      db.insert(trafficLogs)
-        .values({
-          user_id: user.id,
-          node_id: node.id,
-          tx_bytes: traffic.tx,
-          rx_bytes: traffic.rx,
-        })
-        .run();
-
-      db.update(users)
-        .set({ used_bytes: sql`used_bytes + ${totalBytes}` })
-        .where(eq(users.id, user.id))
-        .run();
-
-      result.synced++;
-    }
-
-    db.$client.run("COMMIT");
-  } catch (err: any) {
+    writeTrafficBatch(db, node.id, data, result);
+  } catch (err: unknown) {
     db.$client.run("ROLLBACK");
     console.error(`Traffic sync DB write failed for Xray node ${node.name}, raw data:`, JSON.stringify([...data]));
-    result.errors.push(`DB write failed: ${err.message}`);
+    result.errors.push(`DB write failed: ${errorMessage(err)}`);
   }
 
   return result;
 }
 
-// 从单个节点同步流量数据（协议分发）
-export async function syncTrafficFromNode(
-  db: Db,
-  node: Node,
-): Promise<SyncResult> {
+async function syncTrafficFromHysteria(db: Db, node: Node): Promise<SyncResult> {
+  const result: SyncResult = { nodeId: node.id, synced: 0, errors: [] };
+
+  let data: Record<string, { tx: number; rx: number }>;
+  try {
+    data = await queryHysteriaTraffic(node, true);
+  } catch (err: unknown) {
+    result.errors.push(`Fetch failed for node ${node.name}: ${errorMessage(err)}`);
+    return result;
+  }
+
+  try {
+    writeTrafficBatch(db, node.id, Object.entries(data), result);
+  } catch (err: unknown) {
+    db.$client.run("ROLLBACK");
+    console.error(`Traffic sync DB write failed for node ${node.name}, raw data:`, JSON.stringify(data));
+    result.errors.push(`DB write failed: ${errorMessage(err)}`);
+  }
+
+  return result;
+}
+
+export async function syncTrafficFromNode(db: Db, node: Node): Promise<SyncResult> {
   const circuitKey = `traffic:${node.id}`;
 
   if (!isCallAllowed(circuitKey)) {
@@ -117,73 +143,12 @@ export async function syncTrafficFromNode(
       recordFailure(circuitKey);
     }
     return result;
-  } catch (err: any) {
+  } catch (err: unknown) {
     recordFailure(circuitKey);
-    return { nodeId: node.id, synced: 0, errors: [err.message] };
+    return { nodeId: node.id, synced: 0, errors: [errorMessage(err)] };
   }
 }
 
-// Hysteria2 节点使用 HTTP stats API
-async function syncTrafficFromHysteria(db: Db, node: Node): Promise<SyncResult> {
-  const result: SyncResult = { nodeId: node.id, synced: 0, errors: [] };
-
-  let data: Record<string, { tx: number; rx: number }>;
-  try {
-    data = await queryHysteriaTraffic(node, true);
-  } catch (err: any) {
-    result.errors.push(`Fetch failed for node ${node.name}: ${err.message}`);
-    return result;
-  }
-
-  // 事务包裹所有 DB 写入：要么全部成功，要么全部回滚
-  // 因为 clear=1 已清除节点数据，失败时记录原始数据供手动恢复
-  try {
-    db.$client.run("BEGIN");
-
-    for (const [username, traffic] of Object.entries(data)) {
-      const totalBytes = traffic.tx + traffic.rx;
-      if (totalBytes === 0) continue;
-
-      const user = db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.name, username))
-        .get();
-
-      if (!user) {
-        result.errors.push(`Unknown user: ${username}`);
-        continue;
-      }
-
-      db.insert(trafficLogs)
-        .values({
-          user_id: user.id,
-          node_id: node.id,
-          tx_bytes: traffic.tx,
-          rx_bytes: traffic.rx,
-        })
-        .run();
-
-      db.update(users)
-        .set({ used_bytes: sql`used_bytes + ${totalBytes}` })
-        .where(eq(users.id, user.id))
-        .run();
-
-      result.synced++;
-    }
-
-    db.$client.run("COMMIT");
-  } catch (err: any) {
-    db.$client.run("ROLLBACK");
-    // 记录原始数据，防止 clear=1 后数据彻底丢失
-    console.error(`Traffic sync DB write failed for node ${node.name}, raw data:`, JSON.stringify(data));
-    result.errors.push(`DB write failed: ${err.message}`);
-  }
-
-  return result;
-}
-
-// 同步所有已启用且配置了 stats_port 的节点（并行）
 export async function syncAllNodes(db: Db): Promise<SyncResult[]> {
   const enabledNodes = db
     .select()
@@ -216,7 +181,6 @@ export async function syncAllNodes(db: Db): Promise<SyncResult[]> {
   return results;
 }
 
-// 查询流量统计（支持多维度筛选）
 export function getTrafficStats(db: Db, filters?: TrafficFilters): TrafficStat[] {
   const conditions = [];
 
@@ -248,7 +212,6 @@ export function getTrafficStats(db: Db, filters?: TrafficFilters): TrafficStat[]
   }));
 }
 
-// 清理过期流量日志（默认保留 90 天）
 export function cleanupOldTrafficLogs(db: Db, retentionDays: number = 90): void {
   db.$client.run(
     `DELETE FROM traffic_logs WHERE recorded_at < datetime('now', ?)`,
@@ -256,7 +219,6 @@ export function cleanupOldTrafficLogs(db: Db, retentionDays: number = 90): void 
   );
 }
 
-// 启动定时流量同步
 export function startTrafficSync(db: Db, intervalMs: number): Timer {
   return setInterval(() => {
     syncAllNodes(db).catch((err) => {

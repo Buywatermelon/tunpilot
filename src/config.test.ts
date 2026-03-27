@@ -7,13 +7,20 @@ describe("config", () => {
     delete process.env.TUNPILOT_PORT;
     delete process.env.TUNPILOT_DB_PATH;
     delete process.env.TRAFFIC_SYNC_INTERVAL;
+    delete process.env.SESSION_TTL;
+    delete process.env.RECONCILE_INTERVAL;
+    delete process.env.TRAFFIC_RETENTION_DAYS;
 
     const config = getConfig();
     expect(config.port).toBe(3000);
     expect(config.host).toBe("0.0.0.0");
     expect(config.dbPath).toBe("./data/tunpilot.db");
     expect(config.baseUrl).toBe("http://localhost:3000");
-    expect(config.trafficSyncInterval).toBe(300000);
+    expect(config.trafficSyncInterval).toBe(300_000);
+    expect(config.sessionTtl).toBe(30 * 60 * 1000);
+    expect(config.sessionCleanupInterval).toBe(60_000);
+    expect(config.reconcileInterval).toBe(600_000);
+    expect(config.retentionDays).toBe(90);
 
     Object.assign(process.env, saved);
   });
@@ -26,6 +33,9 @@ describe("config", () => {
     process.env.TUNPILOT_BASE_URL = "https://example.com";
     process.env.MCP_AUTH_TOKEN = "test-token";
     process.env.TRAFFIC_SYNC_INTERVAL = "60000";
+    process.env.SESSION_TTL = "900000";
+    process.env.RECONCILE_INTERVAL = "120000";
+    process.env.TRAFFIC_RETENTION_DAYS = "30";
 
     const config = getConfig();
     expect(config.port).toBe(4000);
@@ -34,6 +44,9 @@ describe("config", () => {
     expect(config.baseUrl).toBe("https://example.com");
     expect(config.mcpAuthToken).toBe("test-token");
     expect(config.trafficSyncInterval).toBe(60000);
+    expect(config.sessionTtl).toBe(900_000);
+    expect(config.reconcileInterval).toBe(120_000);
+    expect(config.retentionDays).toBe(30);
 
     Object.assign(process.env, saved);
   });

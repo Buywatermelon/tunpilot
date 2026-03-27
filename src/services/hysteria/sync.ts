@@ -157,9 +157,9 @@ export async function deployNodeUsers(db: Db, node: Node): Promise<ReconcileResu
 
       result.added = Object.keys(desiredUsers).length;
       recordSuccess(circuitKey);
-    } catch (err: any) {
+    } catch (err: unknown) {
       recordFailure(circuitKey);
-      result.errors.push(err.message);
+      result.errors.push(err instanceof Error ? err.message : String(err));
     }
 
     return result;

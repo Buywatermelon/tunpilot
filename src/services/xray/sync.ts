@@ -59,15 +59,18 @@ export async function deployNodeUsers(db: Db, node: Node): Promise<ReconcileResu
       const configStr = await sshExec(node, `cat ${configPath}`);
       const config = JSON.parse(configStr);
 
-      const trojanInbound = config.inbounds?.find((i: any) => i.tag === INBOUND_TAG);
+      const trojanInbound = config.inbounds?.find(
+        (i: { tag?: string }) => i.tag === INBOUND_TAG,
+      );
       if (!trojanInbound) {
         result.errors.push(`Inbound '${INBOUND_TAG}' not found in config`);
         return result;
       }
 
-      const currentClients = (trojanInbound.settings?.clients || [])
-        .map((c: any) => ({ password: c.password, email: c.email, level: c.level ?? 0 }))
-        .sort((a: any, b: any) => a.email.localeCompare(b.email));
+      interface XrayClient { password: string; email: string; level: number }
+      const currentClients: XrayClient[] = (trojanInbound.settings?.clients || [])
+        .map((c: XrayClient) => ({ password: c.password, email: c.email, level: c.level ?? 0 }))
+        .sort((a: XrayClient, b: XrayClient) => a.email.localeCompare(b.email));
 
       // Skip restart if config already matches desired state
       if (JSON.stringify(desiredClients) === JSON.stringify(currentClients)) {
@@ -82,9 +85,9 @@ export async function deployNodeUsers(db: Db, node: Node): Promise<ReconcileResu
 
       result.added = desiredClients.length;
       recordSuccess(circuitKey);
-    } catch (err: any) {
+    } catch (err: unknown) {
       recordFailure(circuitKey);
-      result.errors.push(err.message);
+      result.errors.push(err instanceof Error ? err.message : String(err));
     }
 
     return result;

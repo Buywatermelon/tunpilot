@@ -37,12 +37,11 @@ if (config.mcpAuthToken) {
   app.use("/mcp", bearerAuth({ token: config.mcpAuthToken }));
 }
 
-// MCP 会话管理：每个客户端连接独立的 McpServer + Transport（带 TTL）
+// MCP 会话管理
 interface ManagedSession {
   transport: StreamableHTTPTransport;
   lastAccess: number;
 }
-const SESSION_TTL = 30 * 60 * 1000; // 30 分钟无活动自动清理
 const sessions = new Map<string, ManagedSession>();
 
 app.all("/mcp", async (c) => {
@@ -76,24 +75,23 @@ app.all("/mcp", async (c) => {
   return transport.handleRequest(c);
 });
 
-// 定期清理过期 MCP 会话
 const sessionCleanup = setInterval(() => {
   const now = Date.now();
   for (const [id, session] of sessions) {
-    if (now - session.lastAccess > SESSION_TTL) {
+    if (now - session.lastAccess > config.sessionTtl) {
       sessions.delete(id);
     }
   }
-}, 60_000);
+}, config.sessionCleanupInterval);
 
 // 启动流量同步
 const syncTimer = startTrafficSync(db, config.trafficSyncInterval);
 
-// 启动流量日志清理（每天一次，保留 90 天）
-cleanupOldTrafficLogs(db);
-const retentionTimer = setInterval(() => cleanupOldTrafficLogs(db), 24 * 60 * 60 * 1000);
+// 流量日志清理
+cleanupOldTrafficLogs(db, config.retentionDays);
+const retentionTimer = setInterval(() => cleanupOldTrafficLogs(db, config.retentionDays), 24 * 60 * 60 * 1000);
 
-// Xray/Trojan 节点：启动时全量对账 + 定期对账（10 分钟）
+// 节点对账
 reconcileAllXrayNodes(db).catch((err) => {
   console.error("Initial Xray reconciliation failed:", err);
 });
@@ -107,7 +105,7 @@ const xrayReconcileTimer = setInterval(() => {
   reconcileAllHysteriaNodes(db).catch((err) => {
     console.error("Hysteria reconciliation failed:", err);
   });
-}, 600_000);
+}, config.reconcileInterval);
 
 // 启动服务器
 const server = Bun.serve({

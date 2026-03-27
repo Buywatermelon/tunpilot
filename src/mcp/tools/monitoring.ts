@@ -50,11 +50,11 @@ export function register(server: McpServer, db: Db, _baseUrl: string) {
               } else if (node.stats_secret) {
                 return { ...base, status: await pingHysteriaStats(node) };
               }
-            } catch (err: any) {
+            } catch (err: unknown) {
               console.error(JSON.stringify({
                 event: "health_check_failed",
                 nodeId: node.id,
-                error: err.message,
+                error: err instanceof Error ? err.message : String(err),
               }));
               return { ...base, status: "unreachable" as const };
             }

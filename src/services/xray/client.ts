@@ -13,7 +13,9 @@ const statsDef = protoLoader.loadSync(join(PROTO_DIR, "stats.proto"), {
 });
 const statsProto = grpc.loadPackageDefinition(statsDef);
 
-const StatsService = (statsProto.xray as any).app.stats.command.StatsService;
+// gRPC generated service constructor — dynamic proto loading doesn't provide static types
+const StatsService = (statsProto as Record<string, Record<string, unknown>>).xray.app.stats.command
+  .StatsService as grpc.ServiceClientConstructor;
 
 const GRPC_TIMEOUT = 15_000; // ms
 
@@ -22,12 +24,20 @@ export interface TrafficData {
   rx: number;
 }
 
+interface StatEntry {
+  name: string;
+  value: number;
+}
+
+interface QueryStatsResponse {
+  stat?: StatEntry[];
+}
+
 /**
  * Xray stats client — queries per-user traffic via gRPC StatsService.
- * User management is handled via config file (not gRPC HandlerService).
  */
 export class XrayClient {
-  private stats: any;
+  private stats: grpc.Client;
 
   constructor(host: string, port: number) {
     const address = `${host}:${port}`;
@@ -35,19 +45,14 @@ export class XrayClient {
     this.stats = new StatsService(address, creds);
   }
 
-  /**
-   * Query per-user traffic stats from Xray.
-   * Stats pattern: "user>>>email>>>traffic>>>uplink" / "downlink"
-   * @param reset - If true, resets counters after reading (like hy2's clear=1)
-   */
   queryTraffic(reset: boolean = true): Promise<Map<string, TrafficData>> {
     const deadline = new Date(Date.now() + GRPC_TIMEOUT);
 
     return new Promise((resolve, reject) => {
-      this.stats.QueryStats(
+      (this.stats as grpc.Client & Record<string, Function>).QueryStats(
         { pattern: "user>>>", reset },
         { deadline },
-        (err: grpc.ServiceError | null, response: any) => {
+        (err: grpc.ServiceError | null, response: QueryStatsResponse) => {
           if (err) return reject(err);
 
           const result = new Map<string, TrafficData>();
@@ -77,7 +82,6 @@ export class XrayClient {
     });
   }
 
-  /** Close the gRPC channel. */
   close(): void {
     grpc.closeClient(this.stats);
   }
