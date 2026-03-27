@@ -21,6 +21,7 @@ export const nodes = sqliteTable("nodes", {
   cert_fingerprint: text("cert_fingerprint"),
   insecure: integer("insecure").default(0),
   obfs_password: text("obfs_password"),
+  port_hopping: text("port_hopping"),
   enabled: integer("enabled").default(1),
   created_at: text("created_at").default(sql`(datetime('now'))`),
 });

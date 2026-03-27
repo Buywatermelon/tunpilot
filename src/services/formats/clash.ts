@@ -34,6 +34,9 @@ export const clash: SubscriptionFormat = {
         if (n.obfs_password && n.protocol !== "trojan") {
           entry += `\n    obfs: salamander\n    obfs-password: "${n.obfs_password}"`;
         }
+        if (n.port_hopping && n.protocol !== "trojan") {
+          entry += `\n    ports: "${n.port_hopping}"\n    hop-interval: 30`;
+        }
         return entry;
       })
       .join("\n\n");

@@ -41,6 +41,7 @@ export function register(server: McpServer, db: Db, _baseUrl: string) {
         cert_fingerprint: z.string().optional().describe("SHA-256 hex fingerprint for self-signed cert pinning"),
         insecure: z.number().optional().describe("1 = self-signed cert (skip verification), 0 = valid cert"),
         obfs_password: z.string().optional().describe("Salamander obfuscation password (Hysteria2 only). When set, subscription configs include obfs params"),
+        port_hopping: z.string().optional().describe("Port hopping range for Hysteria2 (e.g. '20000-50000,8443'). Requires iptables NAT on the server"),
       },
     },
     async (args) => {
@@ -74,6 +75,7 @@ export function register(server: McpServer, db: Db, _baseUrl: string) {
         cert_fingerprint: z.string().optional().describe("SHA-256 hex fingerprint for self-signed cert pinning"),
         insecure: z.number().optional().describe("1 = self-signed cert, 0 = valid cert"),
         obfs_password: z.string().optional().describe("Salamander obfuscation password (Hysteria2 only)"),
+        port_hopping: z.string().optional().describe("Port hopping range for Hysteria2 (e.g. '20000-50000,8443')"),
         enabled: z.number().optional().describe("1 = enabled, 0 = disabled"),
       },
     },

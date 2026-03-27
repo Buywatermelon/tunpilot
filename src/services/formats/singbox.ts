@@ -86,6 +86,10 @@ export const singbox: SubscriptionFormat = {
       if (n.obfs_password) {
         hy2.obfs = { type: "salamander", password: n.obfs_password };
       }
+      if (n.port_hopping) {
+        hy2.hop_ports = n.port_hopping;
+        hy2.hop_interval = "30s";
+      }
       return hy2;
     });
 

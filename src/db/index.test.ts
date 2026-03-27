@@ -39,6 +39,7 @@ describe("database", () => {
     expect(cols).toContain("stats_port");
     expect(cols).toContain("stats_secret");
     expect(cols).toContain("obfs_password");
+    expect(cols).toContain("port_hopping");
     expect(cols).toContain("insecure");
     expect(cols).toContain("ssh_alias");
     expect(cols).toContain("cert_fingerprint");

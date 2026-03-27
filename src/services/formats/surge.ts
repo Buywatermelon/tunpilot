@@ -23,6 +23,9 @@ function renderProxyLine(node: Node, password: string): string {
   if (node.obfs_password && node.protocol !== "trojan") {
     parts.push(`obfs=salamander`, `obfs-password=${node.obfs_password}`);
   }
+  if (node.port_hopping && node.protocol !== "trojan") {
+    parts.push(`port-hopping=${node.port_hopping}`, `port-hopping-interval=30`);
+  }
   return parts.join(", ");
 }
 
