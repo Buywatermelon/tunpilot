@@ -11,12 +11,8 @@ export const commands: Command[] = [
       to: { description: "End date (ISO 8601)" },
     },
     run: (client, args) => {
-      const params = new URLSearchParams();
-      if (args.user) params.set("user_id", args.user);
-      if (args.node) params.set("node_id", args.node);
-      if (args.from) params.set("from", args.from);
-      if (args.to) params.set("to", args.to);
-      const qs = params.toString();
+      const map: Record<string, string> = { user: "user_id", node: "node_id", from: "from", to: "to" };
+      const qs = Object.entries(map).filter(([k]) => args[k]).map(([k, v]) => `${v}=${args[k]}`).join("&");
       return client.get(`/traffic${qs ? `?${qs}` : ""}`);
     },
   },

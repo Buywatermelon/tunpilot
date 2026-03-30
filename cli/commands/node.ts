@@ -34,10 +34,7 @@ export const commands: Command[] = [
     },
     run: (client, args) => {
       const body: Record<string, unknown> = { ...args };
-      if (body.port) body.port = Number(body.port);
-      if (body.stats_port) body.stats_port = Number(body.stats_port);
-      if (body.ssh_port) body.ssh_port = Number(body.ssh_port);
-      if (body.insecure) body.insecure = Number(body.insecure);
+      for (const k of ["port", "stats_port", "ssh_port", "insecure"]) if (body[k]) body[k] = Number(body[k]);
       return client.post("/nodes", body);
     },
   },
@@ -56,11 +53,8 @@ export const commands: Command[] = [
       insecure: { description: "Skip TLS verification (0 or 1)" },
     },
     run: (client, args) => {
-      const { id, ...rest } = args;
-      const body: Record<string, unknown> = { ...rest };
-      if (body.port) body.port = Number(body.port);
-      if (body.stats_port) body.stats_port = Number(body.stats_port);
-      if (body.insecure) body.insecure = Number(body.insecure);
+      const { id, ...body } = args as Record<string, unknown>;
+      for (const k of ["port", "stats_port", "insecure"]) if (body[k]) body[k] = Number(body[k]);
       return client.patch(`/nodes/${id}`, body);
     },
   },

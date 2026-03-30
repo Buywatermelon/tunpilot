@@ -111,6 +111,10 @@ function parseArgs(argv: string[]): { positionals: string[]; flags: Record<strin
   return { positionals, flags };
 }
 
+function writeJson(data: unknown): void {
+  process.stdout.write(JSON.stringify(data) + "\n");
+}
+
 async function main(): Promise<void> {
   const rawArgs = process.argv.slice(2);
   const { positionals, flags } = parseArgs(rawArgs);
@@ -133,12 +137,11 @@ async function main(): Promise<void> {
     const action = positionals[1]!;
     if (action === "set" && positionals.length >= 4) {
       setConfigValue(positionals[2]!, positionals[3]!);
-      process.stdout.write(JSON.stringify({ ok: true }) + "\n");
+      writeJson({ ok: true });
       return;
     }
     if (action === "get" && positionals.length >= 3) {
-      const value = getConfigValue(positionals[2]!);
-      process.stdout.write(JSON.stringify({ value: value ?? null }) + "\n");
+      writeJson({ value: getConfigValue(positionals[2]!) ?? null });
       return;
     }
     printConfigHelp();
@@ -161,52 +164,40 @@ async function main(): Promise<void> {
     return;
   }
 
-  // Single-command groups (health, traffic): no action name, all positionals are args
+  // Resolve command: single-command groups vs multi-command groups
+  let cmd: Command;
+  let positionalStart: number;
+
   if (group.commands.length === 1 && group.commands[0]!.name === "") {
-    const singleCmd = group.commands[0]!;
+    cmd = group.commands[0]!;
+    positionalStart = 1;
     if (hasHelp) {
-      printCommandHelp(group, singleCmd);
+      printCommandHelp(group, cmd);
       return;
     }
-    const cmdArgs: Record<string, string | undefined> = { ...flags };
-    delete cmdArgs.help;
-    // First positional after resource name is the command's positional arg
-    if (singleCmd.positional && positionals[1]) {
-      const posName = singleCmd.positional.replace(/[\[\]]/g, "");
-      cmdArgs[posName] = positionals[1];
+  } else {
+    const actionName = positionals[1];
+    if (!actionName) {
+      printResourceHelp(group);
+      return;
     }
-    const client = createClient();
-    const result = await singleCmd.run(client, cmdArgs);
-    if (result !== null && result !== undefined) {
-      process.stdout.write(JSON.stringify(result) + "\n");
+    const found = group.commands.find((c) => c.name === actionName);
+    if (!found) {
+      process.stderr.write(JSON.stringify({ error: `Unknown action: ${resourceName} ${actionName}` }) + "\n");
+      process.exit(1);
     }
-    return;
-  }
-
-  let actionName = positionals[1];
-  let positionalStart = 2;
-
-  if (!actionName) {
-    printResourceHelp(group);
-    return;
-  }
-
-  const cmd = group.commands.find((c) => c.name === actionName);
-  if (!cmd) {
-    process.stderr.write(JSON.stringify({ error: `Unknown action: ${resourceName} ${actionName}` }) + "\n");
-    process.exit(1);
-  }
-
-  if (hasHelp) {
-    printCommandHelp(group, cmd);
-    return;
+    cmd = found;
+    positionalStart = 2;
+    if (hasHelp) {
+      printCommandHelp(group, cmd);
+      return;
+    }
   }
 
   // Build args for the command
   const cmdArgs: Record<string, string | undefined> = { ...flags };
   delete cmdArgs.help;
 
-  // Parse positional arguments
   if (cmd.positional) {
     const posNames = cmd.positional.replace(/[\[\]]/g, "").split(" ");
     for (let i = 0; i < posNames.length && positionalStart + i < positionals.length; i++) {
@@ -217,7 +208,7 @@ async function main(): Promise<void> {
   const client = createClient();
   const result = await cmd.run(client, cmdArgs);
   if (result !== null && result !== undefined) {
-    process.stdout.write(JSON.stringify(result) + "\n");
+    writeJson(result);
   }
 }
 

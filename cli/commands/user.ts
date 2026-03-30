@@ -42,19 +42,10 @@ export const commands: Command[] = [
     },
     run: async (client, args) => {
       const { id, nodes: nodesArg, quota_bytes, max_devices, ...rest } = args;
-      const updateBody: Record<string, unknown> = { ...rest };
-      if (quota_bytes) updateBody.quota_bytes = Number(quota_bytes);
-      if (max_devices) updateBody.max_devices = Number(max_devices);
-
-      const results: unknown[] = [];
-      if (Object.keys(updateBody).length > 0) {
-        results.push(await client.patch(`/users/${id}`, updateBody));
-      }
-      if (nodesArg) {
-        const nodeIds = nodesArg!.split(",");
-        results.push(await client.put(`/users/${id}/nodes`, { node_ids: nodeIds }));
-      }
-      return results.length === 1 ? results[0] : results;
+      const body: Record<string, unknown> = { ...rest, ...(quota_bytes && { quota_bytes: Number(quota_bytes) }), ...(max_devices && { max_devices: Number(max_devices) }) };
+      const updated = Object.keys(body).length > 0 ? await client.patch(`/users/${id}`, body) : null;
+      const assigned = nodesArg ? await client.put(`/users/${id}/nodes`, { node_ids: nodesArg.split(",") }) : null;
+      return updated && assigned ? [updated, assigned] : (updated ?? assigned);
     },
   },
   {
