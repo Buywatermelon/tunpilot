@@ -14,7 +14,7 @@ metadata:
 
 Deploy a production-grade Hysteria2 proxy node with automatic performance tuning, security hardening, and censorship resistance. Follow each phase in order.
 
-**Prerequisite**: TunPilot server must be running and MCP must be connected (use `getting-started` skill if not).
+**Prerequisite**: TunPilot server must be running and CLI must be configured (use `getting-started` skill if not).
 
 ---
 
@@ -185,26 +185,25 @@ SELFSIGN
 
 ### 2.5 Register Node in TunPilot
 
-Use the `add_node` MCP tool. This returns the `auth_callback_url` needed for the Hysteria2 config.
+Use the CLI to register the node:
 
-Required parameters:
+```bash
+tunpilot node add \
+  --name=<node-name> \
+  --host=<server-ip-or-domain> \
+  --port=443 \
+  --protocol=hysteria2 \
+  --stats_port=9999 \
+  --stats_secret=<random-string> \
+  --sni=<domain> \
+  --insecure=1
+```
 
-- `name`: the node name from Phase 1.1
-- `host`: the server's IP or domain
-- `port`: `443`
-- `protocol`: `hysteria2`
+Required flags: `--name`, `--host`, `--port`, `--protocol`
 
-Recommended optional parameters:
+Optional flags: `--stats_port`, `--stats_secret`, `--sni`, `--cert_path`, `--ssh_user`, `--ssh_port`, `--insecure` (1 for self-signed, 0 for ACME)
 
-- `stats_port`: `9999`
-- `stats_secret`: generate a random string
-- `sni`: the domain name (if using ACME)
-- `cert_path`: `/etc/hysteria/cert.pem`
-- `ssh_user`: `root`
-- `ssh_port`: `22`
-- `insecure`: `1` if using self-signed certificates (Option B), `0` if using ACME (Option A)
-
-**Save the returned `auth_callback_url`** — it looks like `http://<tunpilot-ip>:3000/auth/<node-id>/<auth-secret>`.
+**Save the returned node ID and `auth_callback_url`** from the JSON output.
 
 ### 2.6 Write Production Config
 
@@ -287,7 +286,11 @@ ssh <server> "journalctl -u hysteria-server --no-pager -n 50"
 
 ### 3.1 Health Check
 
-Use the `check_health` MCP tool to confirm the node is registered and reachable.
+Use the CLI to check node health:
+
+```bash
+tunpilot health
+```
 
 ### 3.2 Masquerade Test
 
@@ -328,7 +331,7 @@ Present a final report to the user:
 - Congestion control and bandwidth limits
 - Kernel tuning applied
 - Health check result
-- Subscription instructions (use `assign_nodes` to grant users access)
+- Subscription instructions (use `tunpilot user update <id> --nodes=<node-id>` to grant users access)
 
 ---
 
@@ -336,7 +339,7 @@ Present a final report to the user:
 
 | Symptom | Diagnosis | Fix |
 |---------|-----------|-----|
-| `check_health` unreachable | Stats API not accessible | Verify `stats_port` and `stats_secret` match between TunPilot and the node config |
+| `tunpilot health` unreachable | Stats API not accessible | Verify `stats_port` and `stats_secret` match between TunPilot and the node config |
 | Service won't start | Config syntax error | Run `journalctl -u hysteria-server --no-pager -n 50` and validate YAML syntax |
 | ACME cert fails | DNS not pointing to server | Check `dig <domain>`, ensure port 80 is open and not occupied |
 | Clients can't connect | Firewall blocking UDP/443 | Check `ss -ulnp | grep 443`, test with `nc -u <ip> 443` |
@@ -345,15 +348,16 @@ Present a final report to the user:
 
 ---
 
-## MCP Tools Reference
+## CLI Commands Reference
 
-| Tool | Use When |
-|------|----------|
-| `list_nodes` | See all registered nodes |
-| `add_node` | Register a new node (Phase 2.5) |
-| `update_node` | Change node config (port, SNI, enable/disable) |
-| `remove_node` | Delete a node (cascades user assignments) |
-| `check_health` | Verify all nodes are reachable |
-| `get_traffic_stats` | Query traffic usage by node or user |
-| `assign_nodes` | Grant a user access to specific nodes |
-| `generate_subscription` | Generate client subscription link for a user |
+| Command | Use When |
+|---------|----------|
+| `tunpilot node list` | See all registered nodes |
+| `tunpilot node add --name=... --host=... --port=... --protocol=...` | Register a new node (Phase 2.5) |
+| `tunpilot node update <id> --name=...` | Change node config (port, SNI, enable/disable) |
+| `tunpilot node remove <id>` | Delete a node (cascades user assignments) |
+| `tunpilot node sync` | Sync all node configurations |
+| `tunpilot health` | Verify all nodes are reachable |
+| `tunpilot traffic --node=<id>` | Query traffic usage by node |
+| `tunpilot user update <id> --nodes=<id1>,<id2>` | Grant a user access to specific nodes |
+| `tunpilot sub create --user=<id> --format=surge` | Generate client subscription link for a user |

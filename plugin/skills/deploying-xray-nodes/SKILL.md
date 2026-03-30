@@ -14,7 +14,7 @@ metadata:
 
 Deploy a production-grade Xray-core Trojan proxy node with automatic performance tuning, security hardening, and certificate fingerprint pinning. Follow each phase in order.
 
-**Prerequisite**: TunPilot server must be running and MCP must be connected (use `getting-started` skill if not).
+**Prerequisite**: TunPilot server must be running and CLI must be configured (use `getting-started` skill if not).
 
 ---
 
@@ -221,25 +221,25 @@ SELFSIGN
 
 ### 2.5 Register Node in TunPilot
 
-Use the `add_node` MCP tool. This returns the `auth_callback_url` (though Trojan/Xray uses gRPC sync rather than HTTP auth callback).
+Use the CLI to register the node:
 
-Required parameters:
+```bash
+tunpilot node add \
+  --name=<node-name> \
+  --host=<server-ip-or-domain> \
+  --port=443 \
+  --protocol=trojan \
+  --stats_port=10085 \
+  --sni=<domain> \
+  --ssh_user=root \
+  --ssh_port=22 \
+  --insecure=1 \
+  --cert_fingerprint=<sha256-fingerprint>
+```
 
-- `name`: the node name from Phase 1.1
-- `host`: the server's IP or domain
-- `port`: `443`
-- `protocol`: `trojan`
+Required flags: `--name`, `--host`, `--port`, `--protocol`
 
-Recommended optional parameters:
-
-- `stats_port`: `10085` (Xray gRPC API port)
-- `sni`: the domain name (if using ACME)
-- `cert_path`: `/etc/xray/cert.pem`
-- `ssh_user`: `root`
-- `ssh_port`: `22`
-- `ssh_alias`: SSH config alias if configured
-- `insecure`: `1` if using self-signed certificates (Config B), `0` if using ACME (Config A)
-- `cert_fingerprint`: SHA-256 fingerprint from step 2.4 (Config B only, hex string without colons)
+Optional flags: `--stats_port`, `--sni`, `--cert_path`, `--ssh_user`, `--ssh_port`, `--ssh_alias`, `--insecure` (1 for self-signed, 0 for ACME), `--cert_fingerprint` (Config B only)
 
 ### 2.6 Write Xray JSON Config
 
@@ -310,7 +310,11 @@ If the service fails to start, check logs immediately:
 ssh <server> "journalctl -u xray --no-pager -n 50"
 ```
 
-After the service is running, use the `sync_xray_nodes` MCP tool to push all assigned users to the node via gRPC.
+After the service is running, sync users to the node:
+
+```bash
+tunpilot node sync
+```
 
 ---
 
@@ -318,7 +322,11 @@ After the service is running, use the `sync_xray_nodes` MCP tool to push all ass
 
 ### 3.1 Health Check
 
-Use the `check_health` MCP tool to confirm the node is registered and reachable.
+Use the CLI to check node health:
+
+```bash
+tunpilot health
+```
 
 ### 3.2 gRPC API Connectivity Test
 
@@ -350,7 +358,7 @@ Present a final report to the user:
 - gRPC API port
 - Kernel tuning applied
 - Health check result
-- Subscription instructions (use `assign_nodes` to grant users access, then `sync_xray_nodes` to push users)
+- Subscription instructions (use `tunpilot user update <id> --nodes=<node-id>` to grant users access, then `tunpilot node sync` to push users)
 
 ---
 
@@ -358,26 +366,26 @@ Present a final report to the user:
 
 | Symptom | Diagnosis | Fix |
 |---------|-----------|-----|
-| `check_health` unreachable | gRPC API not accessible | Verify `stats_port` matches Xray config `api.listen` port, check SSH connectivity |
+| `tunpilot health` unreachable | gRPC API not accessible | Verify `stats_port` matches Xray config `api.listen` port, check SSH connectivity |
 | Service won't start | Config syntax error | Run `journalctl -u xray --no-pager -n 50` and validate JSON syntax with `xray run -test -c /usr/local/etc/xray/config.json` |
 | ACME cert fails | DNS not pointing to server | Check `dig <domain>`, ensure port 80 is open and not occupied |
 | Clients can't connect | Firewall blocking TCP/443 | Check `ss -tlnp | grep 443`, test with `nc -z <ip> 443` |
 | gRPC sync fails | Xray API not listening | Verify `api` block in config, check `ss -tlnp | grep {{API_PORT}}` |
-| Auth failures | Users not synced | Run `sync_xray_nodes` MCP tool to push users to the node |
-| Certificate pinning errors | Fingerprint mismatch | Re-extract fingerprint: `openssl x509 -in /etc/xray/cert.pem -noout -fingerprint -sha256` and update via `update_node` |
+| Auth failures | Users not synced | Run `tunpilot node sync` to push users to the node |
+| Certificate pinning errors | Fingerprint mismatch | Re-extract fingerprint: `openssl x509 -in /etc/xray/cert.pem -noout -fingerprint -sha256` and update via `tunpilot node update <id> --cert_fingerprint=...` |
 
 ---
 
-## MCP Tools Reference
+## CLI Commands Reference
 
-| Tool | Use When |
-|------|----------|
-| `list_nodes` | See all registered nodes |
-| `add_node` | Register a new node (Phase 2.5) — use `protocol: "trojan"` |
-| `update_node` | Change node config (port, SNI, fingerprint, enable/disable) |
-| `remove_node` | Delete a node (cascades user assignments) |
-| `check_health` | Verify all nodes are reachable |
-| `sync_xray_nodes` | Push users to Trojan nodes via gRPC (Phase 2.9) |
-| `get_traffic_stats` | Query traffic usage by node or user |
-| `assign_nodes` | Grant a user access to specific nodes |
-| `generate_subscription` | Generate client subscription link for a user |
+| Command | Use When |
+|---------|----------|
+| `tunpilot node list` | See all registered nodes |
+| `tunpilot node add --name=... --host=... --port=... --protocol=trojan` | Register a new node (Phase 2.5) |
+| `tunpilot node update <id> --name=...` | Change node config (port, SNI, fingerprint, enable/disable) |
+| `tunpilot node remove <id>` | Delete a node (cascades user assignments) |
+| `tunpilot node sync` | Push users to all nodes via gRPC (Phase 2.9) |
+| `tunpilot health` | Verify all nodes are reachable |
+| `tunpilot traffic --node=<id>` | Query traffic usage by node |
+| `tunpilot user update <id> --nodes=<id1>,<id2>` | Grant a user access to specific nodes |
+| `tunpilot sub create --user=<id> --format=surge` | Generate client subscription link for a user |

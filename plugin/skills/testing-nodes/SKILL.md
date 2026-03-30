@@ -24,7 +24,7 @@ Run dual-dimension diagnostics on proxy nodes via direct SSH from the local mach
 
 ## Phase 1: Identify Target
 
-Ask the user which node(s) to test. Use `list_nodes` to show available nodes if needed.
+Ask the user which node(s) to test. Use `tunpilot node list` to show available nodes if needed.
 
 Accept:
 - A single node name or ID
@@ -34,7 +34,7 @@ Accept:
 
 ## Phase 2: Run Diagnostics
 
-For each target node, get `ssh_alias`, `ssh_user`, `host`, and `ssh_port` from the `list_nodes` result.
+For each target node, get `ssh_alias`, `ssh_user`, `host`, and `ssh_port` from the `tunpilot node list` result.
 
 **Resolve SSH target** (use throughout this phase):
 - If `ssh_alias` is set → use `ssh <ssh_alias>` (e.g., `ssh bwg`)
@@ -497,9 +497,9 @@ When comparing multiple nodes, explicitly state:
 
 ---
 
-## MCP Tools Reference
+## CLI Commands Reference
 
-| Tool | Use When |
-|------|----------|
-| `list_nodes` | See all registered nodes and their ssh_alias/ssh_user config |
-| `check_health` | Quick health check before running diagnostics |
+| Command | Use When |
+|---------|----------|
+| `tunpilot node list` | See all registered nodes and their ssh_alias/ssh_user config |
+| `tunpilot health` | Quick health check before running diagnostics |
