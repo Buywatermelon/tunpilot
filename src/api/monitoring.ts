@@ -17,6 +17,8 @@ export function createMonitoringRoutes(db: Db): Hono {
     const nodeId = c.req.query("node_id");
     const from = c.req.query("from");
     const to = c.req.query("to");
+    if (from && isNaN(Date.parse(from))) return c.json({ error: "Invalid 'from' date" }, 400);
+    if (to && isNaN(Date.parse(to))) return c.json({ error: "Invalid 'to' date" }, 400);
     const filters = { userId, nodeId, from, to };
     const stats = getAggregatedTrafficStats(db, filters);
     return c.json(stats);
