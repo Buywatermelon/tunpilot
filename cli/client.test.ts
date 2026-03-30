@@ -67,9 +67,15 @@ describe("client", () => {
       "/tmp/tunpilot-client-test-cfg.json",
       JSON.stringify({ server: `http://localhost:${port}`, token: "t" }),
     );
-    // We can't easily test the 30s timeout, but verify the client creates properly
-    const client = createClient();
-    const result = await client.get("/ok");
-    expect(result).toEqual({ status: "ok" });
+    // Verify AbortSignal.timeout triggers on a slow endpoint
+    let timedOut = false;
+    try {
+      await fetch(`http://localhost:${port}/api/v1/slow`, {
+        signal: AbortSignal.timeout(50),
+      });
+    } catch (e: unknown) {
+      if (e instanceof DOMException && e.name === "TimeoutError") timedOut = true;
+    }
+    expect(timedOut).toBe(true);
   });
 });

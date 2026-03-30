@@ -2,7 +2,7 @@ import type { Command } from "./node";
 
 export const commands: Command[] = [
   {
-    name: "query",
+    name: "",
     description: "Query traffic statistics",
     flags: {
       user: { description: "Filter by user ID" },

@@ -2,7 +2,7 @@ import type { Command } from "./node";
 
 export const commands: Command[] = [
   {
-    name: "check",
+    name: "",
     description: "Check node health status",
     positional: "[node-id]",
     flags: {},
