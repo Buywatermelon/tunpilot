@@ -212,6 +212,34 @@ export function getTrafficStats(db: Db, filters?: TrafficFilters): TrafficStat[]
   }));
 }
 
+export function getAggregatedTrafficStats(
+  db: Db,
+  filters?: TrafficFilters
+): { total_tx: number; total_rx: number; total_bytes: number } {
+  const conditions = [];
+
+  if (filters?.userId) conditions.push(eq(trafficLogs.user_id, filters.userId));
+  if (filters?.nodeId) conditions.push(eq(trafficLogs.node_id, filters.nodeId));
+  if (filters?.from) conditions.push(gte(trafficLogs.recorded_at, filters.from));
+  if (filters?.to) conditions.push(lt(trafficLogs.recorded_at, filters.to));
+
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const row = db
+    .select({
+      total_tx: sql<number>`COALESCE(SUM(${trafficLogs.tx_bytes}), 0)`,
+      total_rx: sql<number>`COALESCE(SUM(${trafficLogs.rx_bytes}), 0)`,
+    })
+    .from(trafficLogs)
+    .where(where)
+    .get();
+
+  const total_tx = row?.total_tx ?? 0;
+  const total_rx = row?.total_rx ?? 0;
+
+  return { total_tx, total_rx, total_bytes: total_tx + total_rx };
+}
+
 export function cleanupOldTrafficLogs(db: Db, retentionDays: number = 90): void {
   db.$client.run(
     `DELETE FROM traffic_logs WHERE recorded_at < datetime('now', ?)`,
