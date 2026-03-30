@@ -41,6 +41,11 @@ export function listSubscriptions(db: Db, userId: string): Subscription[] {
     .all();
 }
 
+// 根据 ID 获取订阅
+export function getSubscription(db: Db, id: string): Subscription | null {
+  return db.select().from(subscriptions).where(eq(subscriptions.id, id)).get() ?? null;
+}
+
 // 删除订阅（撤销 token）
 export function deleteSubscription(db: Db, id: string): void {
   db.delete(subscriptions).where(eq(subscriptions.id, id)).run();

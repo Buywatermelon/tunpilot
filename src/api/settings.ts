@@ -13,8 +13,8 @@ export function createSettingRoutes(db: Db): Hono {
   app.put("/:key", async (c) => {
     const key = c.req.param("key");
     const body = await c.req.json();
-    setSetting(db, key, body.value);
-    return c.json({ key, updated_at: new Date().toISOString() });
+    const result = setSetting(db, key, body.value);
+    return c.json(result);
   });
 
   app.delete("/:key", (c) => {
@@ -22,8 +22,6 @@ export function createSettingRoutes(db: Db): Hono {
     deleteSetting(db, key);
     return c.body(null, 204);
   });
-
-  app.onError((_, c) => c.json({ error: "Internal Server Error" }, 500));
 
   return app;
 }

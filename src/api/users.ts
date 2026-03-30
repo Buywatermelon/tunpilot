@@ -63,12 +63,16 @@ export function createUserRoutes(db: Db, baseUrl: string): Hono {
 
   app.delete("/:id", async (c) => {
     const id = c.req.param("id");
+    const user = getUser(db, id);
+    if (!user) return c.json({ error: "User not found" }, 404);
     await deleteUserWithSync(db, id);
     return c.body(null, 204);
   });
 
   app.post("/:id/reset-traffic", async (c) => {
     const id = c.req.param("id");
+    const user = getUser(db, id);
+    if (!user) return c.json({ error: "User not found" }, 404);
     await resetTrafficWithSync(db, id);
     return c.json({});
   });
@@ -101,6 +105,8 @@ export function createUserRoutes(db: Db, baseUrl: string): Hono {
 
   app.post("/:id/subscriptions", async (c) => {
     const id = c.req.param("id");
+    const user = getUser(db, id);
+    if (!user) return c.json({ error: "User not found" }, 404);
     const body = await c.req.json();
     const sub = generateSubscription(db, id, body.format, baseUrl);
     return c.json(sub, 201);

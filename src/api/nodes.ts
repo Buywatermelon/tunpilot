@@ -28,6 +28,8 @@ export function createNodeRoutes(db: Db): Hono {
 
   app.delete("/:id", (c) => {
     const id = c.req.param("id");
+    const node = getNode(db, id);
+    if (!node) return c.json({ error: "Node not found" }, 404);
     removeNode(db, id);
     return c.body(null, 204);
   });
