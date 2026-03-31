@@ -6,9 +6,12 @@ export const commands: Command[] = [
     description: "Check node health status",
     positional: "[node-id]",
     flags: {},
-    run: (client, args) =>
-      args["node-id"]
-        ? client.get(`/health?node_id=${args["node-id"]}`)
-        : client.get("/health"),
+    run: (client, args) => {
+      if (args["node-id"]) {
+        const params = new URLSearchParams({ node_id: args["node-id"] });
+        return client.get(`/health?${params}`);
+      }
+      return client.get("/health");
+    },
   },
 ];

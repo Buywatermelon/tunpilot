@@ -12,7 +12,9 @@ export const commands: Command[] = [
     },
     run: (client, args) => {
       const map: Record<string, string> = { user: "user_id", node: "node_id", from: "from", to: "to" };
-      const qs = Object.entries(map).filter(([k]) => args[k]).map(([k, v]) => `${v}=${args[k]}`).join("&");
+      const params = new URLSearchParams();
+      for (const [k, v] of Object.entries(map)) if (args[k]) params.set(v, args[k]!);
+      const qs = params.toString();
       return client.get(`/traffic${qs ? `?${qs}` : ""}`);
     },
   },

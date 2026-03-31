@@ -1,6 +1,6 @@
 import { homedir } from "os";
 import { join } from "path";
-import { existsSync, mkdirSync, readFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 
 export interface CliConfig {
   server?: string;
@@ -25,7 +25,7 @@ export function saveConfig(config: CliConfig): void {
   const path = getConfigPath();
   const dir = path.substring(0, path.lastIndexOf("/"));
   mkdirSync(dir, { recursive: true });
-  Bun.write(path, JSON.stringify(config, null, 2) + "\n");
+  writeFileSync(path, JSON.stringify(config, null, 2) + "\n");
 }
 
 export function getConfigValue(key: string): string | undefined {

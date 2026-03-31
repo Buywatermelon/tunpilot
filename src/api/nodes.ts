@@ -26,6 +26,13 @@ export function createNodeRoutes(db: Db): Hono {
     return c.json(node);
   });
 
+  app.get("/:id", (c) => {
+    const id = c.req.param("id");
+    const node = getNode(db, id);
+    if (!node) return c.json({ error: "Node not found" }, 404);
+    return c.json(node);
+  });
+
   app.delete("/:id", (c) => {
     const id = c.req.param("id");
     const node = getNode(db, id);
@@ -40,13 +47,6 @@ export function createNodeRoutes(db: Db): Hono {
       reconcileAllHysteriaNodes(db),
     ]);
     return c.json({ synced: xrayResults.length + hy2Results.length });
-  });
-
-  app.get("/:id", (c) => {
-    const id = c.req.param("id");
-    const node = getNode(db, id);
-    if (!node) return c.json({ error: "Node not found" }, 404);
-    return c.json(node);
   });
 
   return app;

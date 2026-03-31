@@ -13,7 +13,7 @@ export function createSettingRoutes(db: Db): Hono {
   app.put("/:key", async (c) => {
     const key = c.req.param("key");
     const body = await c.req.json();
-    if (!body.value && body.value !== "") return c.json({ error: "value is required" }, 400);
+    if (typeof body.value !== "string") return c.json({ error: "value must be a string" }, 400);
     const result = setSetting(db, key, body.value);
     return c.json(result);
   });

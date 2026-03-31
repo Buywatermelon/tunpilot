@@ -37,6 +37,12 @@ export function createClient(): ApiClient {
 
     if (response.status === 204) return null;
 
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!contentType.includes("application/json")) {
+      const text = await response.text();
+      throw new ApiError(response.status, { error: text.slice(0, 200) || `HTTP ${response.status}` });
+    }
+
     const data = await response.json();
     if (!response.ok) {
       throw new ApiError(response.status, data as { error: string });
