@@ -1,6 +1,6 @@
 ---
 name: getting-started
-description: Use when the user wants to deploy TunPilot server, connect MCP to Claude Code, update an existing installation, or set up TunPilot for the first time.
+description: Use when the user wants to deploy TunPilot server, configure CLI access, update an existing installation, or set up TunPilot for the first time.
 metadata:
   openclaw:
     requires:
@@ -18,7 +18,7 @@ Guide the user from zero to a fully connected TunPilot setup.
 
 Ask the user what they need before jumping into deployment:
 
-- **Already have a running TunPilot server?** → Skip to "Connect MCP"
+- **Already have a running TunPilot server?** → Skip to "Connect CLI"
 - **Already connected but want to update?** → Skip to "Update"
 - **Starting from scratch?** → Continue to "Deploy Server"
 
@@ -51,9 +51,9 @@ The script automatically:
 1. Installs Bun (if not present)
 2. Clones/updates the repo to `/opt/tunpilot`
 3. Installs dependencies
-4. Generates `MCP_AUTH_TOKEN` and creates `.env`
+4. Generates auth token and creates `.env`
 5. Creates and starts a systemd service
-6. Prints the `claude mcp add` command — **capture this output**
+6. Prints connection info — **capture this output**
 
 ### Verify deployment
 
@@ -76,11 +76,11 @@ The same deploy script is idempotent. It `git pull`s and restarts, preserving `.
 ssh <server> "curl -fsSL https://raw.githubusercontent.com/Buywatermelon/tunpilot/main/scripts/deploy.sh | bash"
 ```
 
-## Step 2: Connect MCP
+## Step 2: Connect CLI
 
 ### Verify server is reachable from local machine
 
-Before connecting MCP, confirm the server responds from the client side (run locally, **not** via SSH):
+Before connecting, confirm the server responds from the client side (run locally, **not** via SSH):
 
 ```bash
 curl --max-time 5 http://<ip>:3000/health
@@ -91,65 +91,37 @@ Expected: `{"status":"ok"}`. If this fails:
 - **Timeout** — network path issue. Check if there's a NAT/firewall between your machine and the server. Try `nc -zv <ip> 3000` to test TCP connectivity.
 - **Connection reset** — the service crashed. SSH in and check `journalctl -u tunpilot --no-pager -n 30`.
 
-### Add MCP server
+### Configure CLI
 
-The deploy script prints a ready-to-paste command. Run it locally:
+Set the server URL and auth token:
 
 ```bash
-claude mcp add --transport http \
-  --header "Authorization: Bearer <token>" \
-  --scope user \
-  tunpilot http://<ip>:3000/mcp
+tunpilot config set server http://<ip>:3000
+tunpilot config set token <auth-token>
 ```
 
-If a `tunpilot` MCP entry already exists, remove it first:
-```bash
-claude mcp remove tunpilot
-```
-
-#### Manual connection
-
-If the user already has a server (not just deployed), ask for:
-- Server URL (e.g. `http://1.2.3.4:3000`)
-- MCP auth token (the `MCP_AUTH_TOKEN` value from `/opt/tunpilot/.env`)
-
-Then run the `claude mcp add` command with their values.
-
-### Restart Claude Code
-
-**CRITICAL**: After `claude mcp add`, Claude Code must be restarted to load the new MCP server. Tell the user:
-
-> MCP server added. Please restart Claude Code (exit and reopen) for the connection to take effect.
-
-The agent **cannot** restart Claude Code programmatically — the user must do it manually.
+The auth token is the `AUTH_TOKEN` value from `/opt/tunpilot/.env` on the server.
 
 ### Verify connection
 
-After restart, verify the MCP server is connected:
+After configuring, verify the CLI can reach the server:
 
 ```bash
-claude mcp list
+tunpilot health
 ```
 
-If `claude mcp list` returns empty or doesn't show `tunpilot`, fall back to checking the config file directly:
-```bash
-cat ~/.claude.json | grep -A 5 tunpilot
-```
-
-If the config entry exists but MCP still fails to connect, the issue is runtime connectivity. Re-run the local health check from above.
-
-`--scope user` stores config in `~/.claude.json`, available across all projects.
+This should return JSON with node health status.
 
 ## Security Notice
 
-The default deployment uses **plain HTTP**. The MCP auth token is transmitted in cleartext. For production use, consider one of these mitigations:
+The default deployment uses **plain HTTP**. The auth token is transmitted in cleartext. For production use, consider one of these mitigations:
 
 **Option A — SSH tunnel (simplest, no domain needed):**
 ```bash
 # On the local machine, forward local port 3000 to the server
 ssh -N -L 3000:localhost:3000 <server>
 ```
-Then connect MCP to `http://localhost:3000/mcp` instead. The server can bind to `127.0.0.1` only (change `TUNPILOT_HOST=127.0.0.1` in `.env`).
+Then configure CLI to `http://localhost:3000` instead. The server can bind to `127.0.0.1` only (change `TUNPILOT_HOST=127.0.0.1` in `.env`).
 
 **Option B — Reverse proxy with TLS (requires domain):**
 Use Caddy or nginx in front of TunPilot with a TLS certificate. Update `TUNPILOT_BASE_URL` to the HTTPS URL.
@@ -162,11 +134,11 @@ Restricts port 3000 to only your IP address.
 
 ## What's Next
 
-After connecting, the user has 20 MCP tools across 5 categories:
-- **Nodes** (4): list_nodes, add_node, update_node, remove_node
-- **Users** (7): list_users, create_user, update_user, delete_user, reset_traffic, assign_nodes, list_user_nodes
-- **Subscriptions** (4): generate_subscription, list_subscriptions, delete_subscription, get_subscription_config
-- **Monitoring** (2): check_health, get_traffic_stats
-- **Settings** (3): set_setting, list_settings, delete_setting
+After connecting, the CLI provides commands across 6 categories:
+- **Nodes**: `tunpilot node list`, `tunpilot node add`, `tunpilot node update`, `tunpilot node remove`, `tunpilot node sync`
+- **Users**: `tunpilot user list`, `tunpilot user create`, `tunpilot user update`, `tunpilot user delete`, `tunpilot user reset-traffic`
+- **Subscriptions**: `tunpilot sub list`, `tunpilot sub create`, `tunpilot sub delete`
+- **Monitoring**: `tunpilot health`, `tunpilot traffic`
+- **Settings**: `tunpilot setting list`, `tunpilot setting set`
 
 Next step: deploy proxy nodes using the `deploying-hy2-nodes` (Hysteria2) or `deploying-xray-nodes` (Trojan) skill.

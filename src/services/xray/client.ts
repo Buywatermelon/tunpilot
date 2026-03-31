@@ -14,7 +14,8 @@ const statsDef = protoLoader.loadSync(join(PROTO_DIR, "stats.proto"), {
 const statsProto = grpc.loadPackageDefinition(statsDef);
 
 // gRPC generated service constructor — dynamic proto loading doesn't provide static types
-const StatsService = (statsProto as Record<string, Record<string, unknown>>).xray.app.stats.command
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const StatsService = (statsProto as any).xray.app.stats.command
   .StatsService as grpc.ServiceClientConstructor;
 
 const GRPC_TIMEOUT = 15_000; // ms
@@ -49,7 +50,8 @@ export class XrayClient {
     const deadline = new Date(Date.now() + GRPC_TIMEOUT);
 
     return new Promise((resolve, reject) => {
-      (this.stats as grpc.Client & Record<string, Function>).QueryStats(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (this.stats as any).QueryStats(
         { pattern: "user>>>", reset },
         { deadline },
         (err: grpc.ServiceError | null, response: QueryStatsResponse) => {

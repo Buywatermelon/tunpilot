@@ -1,13 +1,35 @@
 # TunPilot
 
-Hysteria2 / Xray(Trojan) 代理节点管理服务，通过 MCP 供 LLM Agent 操作，无 Web UI。
+Hysteria2 / Xray(Trojan) 代理节点管理服务，Client-Server + CLI 架构。
 
 ## 技术栈
 
 - **运行时**: Bun（非 Node.js）
 - **HTTP**: Hono
 - **数据库**: SQLite via Drizzle ORM (`bun:sqlite`)
-- **MCP**: `@modelcontextprotocol/sdk` + `@hono/mcp`
+
+## 架构
+
+```
+src/                    # Server 端
+├── api/                # REST API 路由 (/api/v1/*)
+├── services/           # 业务逻辑层
+├── db/                 # 数据库层
+├── http/               # 订阅端点
+└── lib/                # 通用工具
+
+cli/                    # CLI 客户端 (tunpilot)
+├── index.ts            # 入口：arg parsing + command dispatch
+├── client.ts           # HTTP API client
+├── config.ts           # CLI 配置 (~/.config/tunpilot/config.json)
+└── commands/           # 命令定义
+    ├── node.ts         # tunpilot node list/add/update/remove/sync
+    ├── user.ts         # tunpilot user list/create/update/delete/reset-traffic
+    ├── sub.ts          # tunpilot sub list/create/delete
+    ├── health.ts       # tunpilot health [node-id]
+    ├── traffic.ts      # tunpilot traffic --user/--node/--from/--to
+    └── setting.ts      # tunpilot setting list/set
+```
 
 ## 常用命令
 
@@ -39,7 +61,7 @@ bun run db:push   # 同步 Drizzle schema 到 SQLite
 
 ## 设置系统
 
-`settings` 表存储 API key 等配置项，值脱敏展示。MCP 工具：set_setting / list_settings / delete_setting
+`settings` 表存储 API key 等配置项，值脱敏展示。CLI 命令：`tunpilot setting list` / `tunpilot setting set <key> <value>`
 
 ## 客户端格式支持
 

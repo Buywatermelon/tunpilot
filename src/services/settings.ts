@@ -8,7 +8,7 @@ export function getSetting(db: Db, key: string): string | null {
   return row?.value ?? null;
 }
 
-export function setSetting(db: Db, key: string, value: string): void {
+export function setSetting(db: Db, key: string, value: string): { key: string; updated_at: string | null } {
   db.insert(settings)
     .values({ key, value })
     .onConflictDoUpdate({
@@ -16,6 +16,8 @@ export function setSetting(db: Db, key: string, value: string): void {
       set: { value, updated_at: sql`(datetime('now'))` },
     })
     .run();
+  const row = db.select().from(settings).where(eq(settings.key, key)).get();
+  return { key, updated_at: row?.updated_at ?? null };
 }
 
 export function deleteSetting(db: Db, key: string): void {
