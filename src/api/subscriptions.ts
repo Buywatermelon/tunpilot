@@ -1,10 +1,14 @@
 import { Hono } from "hono";
-import { getSubscription, deleteSubscription } from "../services/subscription";
+import { getSubscription, deleteSubscription, listAllSubscriptions } from "../services/subscription";
 
 type Db = Parameters<typeof deleteSubscription>[0];
 
 export function createSubscriptionRoutes(db: Db): Hono {
   const app = new Hono();
+
+  app.get("/", (c) => {
+    return c.json(listAllSubscriptions(db));
+  });
 
   app.delete("/:id", (c) => {
     const id = c.req.param("id");

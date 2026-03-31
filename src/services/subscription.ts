@@ -32,6 +32,11 @@ export function generateSubscription(
   return sub;
 }
 
+// 列出所有订阅
+export function listAllSubscriptions(db: Db): Subscription[] {
+  return db.select().from(subscriptions).all();
+}
+
 // 列出用户的所有订阅
 export function listSubscriptions(db: Db, userId: string): Subscription[] {
   return db
