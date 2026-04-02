@@ -1,6 +1,6 @@
 ---
 name: deploying-hy2-nodes
-description: Use when deploying a new Hysteria2 proxy node, configuring TLS certificates, registering nodes in TunPilot, or performing node operations.
+description: "Deploys and configures Hysteria2 proxy nodes with TLS certificates, QUIC kernel tuning, and systemd hardening, then registers them in TunPilot. Use when deploying a new Hysteria2 node, configuring ACME or self-signed TLS, setting up QUIC performance tuning, or registering Hysteria2 nodes in TunPilot."
 metadata:
   openclaw:
     requires:
@@ -134,13 +134,11 @@ ssh <server> "hysteria version"
 
 ### 2.3 Install Diagnostic Dependencies
 
-Install tools required by the diagnostic scripts (IPQuality + NetQuality):
+Install dependencies for the `testing-nodes` skill diagnostics:
 
 ```bash
 ssh <server> "apt-get update -qq && apt-get install -y -qq jq curl bc netcat-openbsd dnsutils iproute2 iperf3 mtr"
 ```
-
-These are needed for the `testing-nodes` skill diagnostics (IPQuality + NetQuality) to work without prompting for interactive installation. NetQuality's remaining dependencies (`speedtest`, `nexttrace`) are auto-installed by the script's `-y` flag on first run.
 
 ### 2.3.1 Install Diagnostics Wrapper
 
