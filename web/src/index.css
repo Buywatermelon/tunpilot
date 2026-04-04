@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #FAF9F6;
+  --color-surface: #FFFFFF;
+  --color-text-primary: #2D2B2A;
+  --color-text-secondary: #78716C;
+  --color-text-muted: #A8A29E;
+  --color-accent: #C4704B;
+  --color-accent-hover: #B5613D;
+  --color-accent-soft: #F4E8E1;
+  --color-border: #E7E5E0;
+  --color-border-subtle: #F0EEED;
+  --color-success: #5D8C5A;
+  --color-warning: #D4A843;
+  --color-danger: #C75D4A;
+  --font-heading: "Plus Jakarta Sans", system-ui, sans-serif;
+}
+
+:root {
+  --background: #FAF9F6;
+  --surface: #FFFFFF;
+  --text-primary: #2D2B2A;
+  --text-secondary: #78716C;
+  --text-muted: #A8A29E;
+  --accent: #C4704B;
+  --accent-hover: #B5613D;
+  --accent-soft: #F4E8E1;
+  --border: #E7E5E0;
+  --border-subtle: #F0EEED;
+  --success: #5D8C5A;
+  --warning: #D4A843;
+  --danger: #C75D4A;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--text-primary);
+  background-color: var(--background);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1 {
+  font-family: var(--font-heading, "Plus Jakarta Sans", system-ui, sans-serif);
+  font-size: 1.875rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+h2 {
+  font-family: var(--font-heading, "Plus Jakarta Sans", system-ui, sans-serif);
+  font-size: 1.375rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+h3 {
+  font-family: var(--font-heading, "Plus Jakarta Sans", system-ui, sans-serif);
+  font-size: 1.175rem;
+  font-weight: 500;
+  line-height: 1.3;
+}

@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { serveStatic } from "hono/bun";
 import { getConfig } from "./config.ts";
 import { initDatabase } from "./db/index.ts";
 import { createHttpApp } from "./http/index.ts";
@@ -27,6 +28,14 @@ app.route("/", createHttpApp(db, config.baseUrl));
 
 // 挂载 REST API 路由
 app.route("/api/v1", createApiApp(db, config.baseUrl));
+
+// 静态文件服务（Web Admin）
+app.use("/*", serveStatic({ root: "./web/dist" }));
+app.get("/*", async (c) => {
+  const html = Bun.file("./web/dist/index.html");
+  if (await html.exists()) return c.html(await html.text());
+  return c.text("Not found", 404);
+});
 
 // 启动流量同步
 const syncTimer = startTrafficSync(db, config.trafficSyncInterval);
