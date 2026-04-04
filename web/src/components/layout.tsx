@@ -54,11 +54,23 @@ export function Layout({ children, onLogout }: LayoutProps) {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto">
-        <div className="max-w-[1200px] mx-auto px-8 py-10">
-          {children}
-        </div>
-      </main>
+      <div className="flex-1 flex flex-col">
+        <header className="h-14 flex items-center justify-end px-8 border-b border-border-subtle bg-surface">
+          <button
+            onClick={onLogout}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-text-secondary hover:bg-danger/10 hover:text-danger transition-all duration-200 cursor-pointer"
+          >
+            <LogOut className="h-4 w-4" />
+            Sign out
+          </button>
+        </header>
+
+        <main className="flex-1 overflow-y-auto">
+          <div className="max-w-[1200px] mx-auto px-8 py-10">
+            {children}
+          </div>
+        </main>
+      </div>
     </div>
   )
 }
