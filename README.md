@@ -1,9 +1,11 @@
 # TunPilot
 
-Agent-native 代理节点管理服务。通过 MCP (Model Context Protocol) 提供 Hysteria2 / Xray(Trojan) 节点的全生命周期管理，专为 LLM Agent 设计，无传统 Web UI。
+Hysteria2 / Xray(Trojan) 代理节点管理服务。提供 Web Admin、REST API、CLI 三种等价入口，配套 Claude Code / OpenClaw Skill 让 Agent 全流程驱动部署。
 
 ```
-用户 → LLM Agent (Claude Code / OpenClaw) → TunPilot MCP → Hysteria2 节点
+Web Admin ─┐
+CLI        ├──► TunPilot (REST API) ──► Hysteria2 / Xray 节点
+Agent      ─┘
 ```
 
 ## 核心功能
@@ -23,146 +25,90 @@ Agent-native 代理节点管理服务。通过 MCP (Model Context Protocol) 提�
 
 ## 快速开始
 
-只需两步：安装插件，然后用自然语言让 Agent 完成一切。
+### 1. 部署服务器
 
-### 1. 安装插件
-
-**Claude Code：**
-
-```
-/plugin marketplace add https://github.com/Buywatermelon/tunpilot.git
-```
-
-```
-/plugin install tunpilot@Buywatermelon-tunpilot
-```
-
-安装后重启 Claude Code 以加载插件。
-
-**OpenClaw：**
+一条命令完成 Bun 安装、仓库克隆、systemd 注册、Web Admin 构建、首次启动：
 
 ```bash
-openclaw plugins install @tunpilot/openclaw-plugin
+ssh <server> "curl -fsSL https://raw.githubusercontent.com/Buywatermelon/tunpilot/main/scripts/deploy.sh | bash"
 ```
 
-### 2. 对话驱动
+脚本会生成 `TUNPILOT_AUTH_TOKEN` 并打印出来，同时给出 Web Admin 地址和 CLI 安装指引。
 
-安装插件后，直接告诉 Agent 你想做什么：
+### 2. 选一种方式管理
 
+**浏览器**：打开 `http://<server>:3000`，粘贴 token 登录即可。
+
+**CLI**：
+
+```bash
+bun install -g github:Buywatermelon/tunpilot
+tunpilot config set server http://<server>:3000
+tunpilot config set token <token>
+tunpilot node list
 ```
-> 帮我在 root@1.2.3.4 上部署 TunPilot 并连接 MCP
-```
 
-Agent 会自动加载 `getting-started` skill，引导完成：
-1. 验证 SSH 连通性（需要提前配好免密登录）
-2. SSH 到你的服务器执行一键部署脚本
-3. 配置 MCP 连接
-4. 验证连接状态
-
-连接成功后，继续用自然语言管理一切：
+**Agent（推荐）**：安装 [Claude Code 插件](plugin/README.md) 或 [OpenClaw 插件](openclaw/README.md)，之后直接自然语言：
 
 ```
 > 部署一个新的 Hysteria2 节点
-> 帮我添加一个新节点，host 是 us1.example.com，端口 443
 > 创建用户 alice，流量配额 50GB
 > 给 alice 生成 Shadowrocket 订阅链接
 > 查看所有用户本月的流量统计
 ```
 
-## Skill 列表
-
-| Skill | 触发场景 | 作用 |
-|-------|---------|------|
-| `getting-started` | 部署 TunPilot / 连接 MCP / 首次配置 | 一键部署服务器 + 自动连接 MCP |
-| `deploying-hy2-nodes` | 部署 Hysteria2 代理节点 | 提供配置模板和分步操作流程 |
-| `deploying-xray-nodes` | 部署 Xray/Trojan 代理节点 | 提供配置模板和分步操作流程 |
-| `testing-nodes` | 质量检测 / 网络测速 / IP 风险扫描 | 直连服务器执行 IPQuality 和 NetQuality 诊断，输出节点健康报告 |
-
-## MCP Tools
-
-连接后通过 MCP 暴露 23 个工具，分为五组：
-
-### 节点管理（5 个）
-| 工具 | 说明 |
-|------|------|
-| `list_nodes` | 列出所有节点 |
-| `add_node` | 注册新节点（保存 stats / SSH / 订阅所需元数据） |
-| `update_node` | 更新节点配置 |
-| `remove_node` | 删除节点 |
-| `sync_xray_nodes` | 强制同步 Xray/Trojan 节点状态（重启后恢复用） |
-
-### 用户管理（9 个）
-| 工具 | 说明 |
-|------|------|
-| `list_users` | 列出所有用户 |
-| `create_user` | 创建用户（Agent 会先确认默认参数） |
-| `update_user` | 更新用户配置 |
-| `delete_user` | 删除用户 |
-| `reset_traffic` | 重置用户已用流量 |
-| `assign_nodes` | 批量分配节点（替换已有分配） |
-| `add_user_node` | 增量添加单个节点权限 |
-| `remove_user_node` | 增量移除单个节点权限 |
-| `list_user_nodes` | 列出用户已分配的节点 |
-
-### 订阅管理（4 个）
-| 工具 | 说明 |
-|------|------|
-| `generate_subscription` | 生成订阅链接（singbox / clash / surge / shadowrocket） |
-| `list_subscriptions` | 列出用户的所有订阅 |
-| `delete_subscription` | 删除/吊销订阅 token |
-| `get_subscription_config` | 预览订阅配置内容（调试用） |
-
-### 监控（2 个）
-| 工具 | 说明 |
-|------|------|
-| `check_health` | 检查所有节点状态（ping stats API） |
-| `get_traffic_stats` | 查询流量统计（支持按用户/节点/时间范围过滤） |
-
-### 设置（3 个）
-| 工具 | 说明 |
-|------|------|
-| `set_setting` | 设置配置项（API key 等） |
-| `list_settings` | 列出所有配置（值已脱敏） |
-| `delete_setting` | 删除配置项 |
+Agent 会加载对应 Skill 并把请求翻译为 CLI 调用。
 
 ## 架构
 
 ```
-src/
-├── index.ts                 # 入口：启动 HTTP 服务器 + MCP 会话管理 + 流量同步
-├── config.ts                # 环境变量配置
-├── db/
-│   ├── schema.ts            # Drizzle ORM 数据表定义
-│   └── index.ts             # 数据库初始化（WAL 模式 + 外键约束）
-├── http/
-│   └── index.ts             # HTTP 路由（订阅下载、健康检查）
-├── mcp/
-│   ├── index.ts             # MCP 服务器工厂（注册全部工具）
-│   └── tools/
-│       ├── nodes.ts         # 节点管理工具（5 个）
-│       ├── users.ts         # 用户管理工具（9 个）
-│       ├── subscriptions.ts # 订阅管理工具（4 个）
-│       ├── monitoring.ts    # 监控工具（2 个）
-│       └── settings.ts      # 设置工具（3 个）
-└── services/
-    ├── node.ts              # 节点 CRUD
-    ├── user.ts              # 用户 CRUD
-    ├── user-ops.ts          # 节点权限分配 + 协议配置同步
-    ├── subscription.ts      # 订阅生命周期（生成、列表、删除、token 查询）
-    ├── traffic.ts           # 流量同步 + 统计查询
-    ├── hysteria/            # Hysteria2 节点同步与 stats 访问
-    │   ├── sync.ts          # userpass / trafficStats 配置对账
-    │   └── stats.ts         # stats API 访问（支持 SSH 隧道）
-    ├── settings.ts          # 配置项管理（API key 等）
-    ├── formats/             # 订阅格式渲染器（Format Registry 模式，仅输出节点）
-    │   ├── index.ts         # 格式注册表
-    │   ├── proxy.ts         # 共享 ProxyConfig 构建逻辑
-    │   ├── singbox.ts       # sing-box outbounds JSON
-    │   ├── clash.ts         # Clash proxy-provider YAML
-    │   ├── surge.ts         # Surge 外部代理列表
-    │   └── shadowrocket.ts  # Shadowrocket base64 URI 列表
-    └── xray/                # Xray/Trojan 节点管理
-        └── sync.ts          # 配置文件同步
+src/                           # 服务端
+├── index.ts                   # 入口：Hono 服务器 + 静态 Web Admin + 流量同步 + 节点对账
+├── api/                       # REST API 路由（/api/v1/*）
+│   ├── nodes.ts               # 节点 CRUD
+│   ├── users.ts               # 用户 CRUD + 节点分配 + 订阅
+│   ├── subscriptions.ts       # 订阅列表/删除
+│   ├── monitoring.ts          # 健康检查 / 流量统计
+│   └── settings.ts            # 配置项管理
+├── http/                      # 非 API 路由
+│   └── index.ts               # /sub/:token 订阅下载 + /health 健康检查
+├── services/                  # 业务层
+│   ├── node.ts, user.ts       # 基础 CRUD
+│   ├── user-ops.ts            # 节点权限分配 + 协议配置下发
+│   ├── subscription.ts        # 订阅生命周期
+│   ├── traffic.ts             # 流量同步 + 统计
+│   ├── health.ts              # 节点健康检查
+│   ├── hysteria/              # Hysteria2 sync + stats（支持 SSH 隧道）
+│   ├── xray/                  # Xray/Trojan gRPC sync
+│   ├── formats/               # 订阅格式渲染器（sing-box / clash / surge / shadowrocket）
+│   └── settings.ts            # 配置项
+└── db/                        # Drizzle ORM schema + 初始化（WAL）
+
+web/                           # Web Admin（React 19 + Vite 6 + Tailwind v4）
+├── src/
+│   ├── app.tsx                # 路由
+│   ├── components/            # UI 原语（Card / Dialog / Input / ...）
+│   ├── pages/                 # Dashboard / Users / Nodes / Subscriptions / Login
+│   └── lib/api.ts             # Bearer 认证的 fetch 封装
+└── vite.config.ts
+
+cli/                           # tunpilot CLI
+├── index.ts                   # arg 解析 + 命令分发
+├── client.ts                  # REST 调用
+├── config.ts                  # ~/.config/tunpilot/config.json
+└── commands/
+    ├── node.ts                # tunpilot node list/add/update/remove/sync
+    ├── user.ts                # tunpilot user list/create/update/delete/reset-traffic
+    ├── sub.ts                 # tunpilot sub list/create/delete
+    ├── health.ts              # tunpilot health
+    ├── traffic.ts             # tunpilot traffic
+    └── setting.ts             # tunpilot setting list/set
+
+skills/                        # Agent Skill（CI 自动同步到 plugin/skills/）
+├── getting-started/           # 部署服务 + 配置 CLI
+├── deploying-hy2-nodes/       # 部署 Hysteria2 节点
+├── deploying-xray-nodes/      # 部署 Xray/Trojan 节点
+└── testing-nodes/             # 节点诊断与测速
 ```
 
 ### 数据模型
@@ -170,8 +116,8 @@ src/
 ```
 nodes ──┐
         ├── user_nodes（多对多）──┐
-users ──┘                        ├── subscriptions
-                                 └── traffic_logs
+users ──┘                         ├── subscriptions
+                                  └── traffic_logs
 settings         # 配置项（API key 等）
 ```
 
@@ -193,15 +139,43 @@ settings         # 配置项（API key 等）
             systemctl reload hysteria-server
 ```
 
-TunPilot 负责维护节点上的 `userpass` 和 `trafficStats` 配置，但不再参与每次连接鉴权。流量采集优先通过 SSH 隧道访问本地 stats 端口，避免暴露到公网。
+TunPilot 负责维护节点上的 `userpass` 和 `trafficStats` 配置，但不参与每次连接鉴权。流量采集优先通过 SSH 隧道访问本地 stats 端口，避免暴露到公网。
 
 ### HTTP 端点
 
-| 端点 | 用途 |
-|------|------|
-| `POST /mcp` | MCP Streamable HTTP（Agent 调用入口） |
-| `GET /sub/:token` | 订阅配置下载（客户端 → TunPilot） |
-| `GET /health` | 健康检查 |
+| 端点 | 用途 | 认证 |
+|------|------|------|
+| `GET /` | Web Admin SPA | — |
+| `POST/GET /api/v1/*` | REST API | Bearer `TUNPILOT_AUTH_TOKEN` |
+| `GET /sub/:token` | 订阅配置下载（客户端消费） | Token 即权限 |
+| `GET /health` | 健康检查 | — |
+
+## REST API 快速参考
+
+| 资源 | 方法 | 路径 |
+|------|------|------|
+| 节点 | `GET/POST/PATCH/DELETE` | `/api/v1/nodes[/:id]` |
+| 节点同步 | `POST` | `/api/v1/nodes/sync` |
+| 用户 | `GET/POST/PATCH/DELETE` | `/api/v1/users[/:id]` |
+| 用户节点分配 | `PUT` | `/api/v1/users/:id/nodes` |
+| 重置流量 | `POST` | `/api/v1/users/:id/reset-traffic` |
+| 订阅 | `GET/DELETE` | `/api/v1/subscriptions[/:id]` |
+| 新建订阅 | `POST` | `/api/v1/users/:id/subscriptions` |
+| 健康检查 | `GET` | `/api/v1/health` |
+| 流量统计 | `GET` | `/api/v1/traffic?user_id=&node_id=&from=&to=` |
+| 设置项 | `GET/POST/DELETE` | `/api/v1/settings[/:key]` |
+
+## CLI 快速参考
+
+```
+tunpilot node    list|add|update|remove|sync
+tunpilot user    list|create|update|delete|reset-traffic
+tunpilot sub     list|create|delete
+tunpilot health  [<node-id>]
+tunpilot traffic --user <id> --node <id> --from <date> --to <date>
+tunpilot setting list|set <key> <value>
+tunpilot config  set server|token <value>
+```
 
 ## 技术栈
 
@@ -211,7 +185,7 @@ TunPilot 负责维护节点上的 `userpass` 和 `trafficStats` 配置，但不�
 | HTTP 框架 | [Hono](https://hono.dev) |
 | 数据库 | SQLite（bun:sqlite，WAL 模式） |
 | ORM | [Drizzle ORM](https://orm.drizzle.team) |
-| MCP SDK | [@modelcontextprotocol/sdk](https://github.com/modelcontextprotocol/typescript-sdk) |
+| Web Admin | React 19 + Vite 6 + Tailwind CSS v4 |
 
 ## 环境变量
 
@@ -220,40 +194,29 @@ TunPilot 负责维护节点上的 `userpass` 和 `trafficStats` 配置，但不�
 | `TUNPILOT_PORT` | `3000` | 监听端口 |
 | `TUNPILOT_HOST` | `0.0.0.0` | 监听地址 |
 | `TUNPILOT_DB_PATH` | `./data/tunpilot.db` | SQLite 数据库路径 |
-| `TUNPILOT_BASE_URL` | `http://localhost:3000` | 外部可访问的基础 URL |
-| `MCP_AUTH_TOKEN` | *(空)* | MCP 端点 Bearer Token |
+| `TUNPILOT_BASE_URL` | `http://localhost:3000` | 外部可访问的基础 URL（影响订阅链接） |
+| `TUNPILOT_AUTH_TOKEN` | *(空)* | Web Admin / REST API Bearer Token |
 | `TRAFFIC_SYNC_INTERVAL` | `300000` | 流量同步间隔，毫秒（默认 5 分钟） |
+| `RECONCILE_INTERVAL` | `600000` | 节点对账间隔，毫秒（默认 10 分钟） |
+| `TRAFFIC_RETENTION_DAYS` | `90` | 流量日志保留天数 |
 
 ## 开发
 
 ```bash
 bun install
-bun test
-bun run dev
+bun test               # 服务端 + CLI 测试
+(cd web && bun install && bun run dev)   # 前端开发（5173 端口，代理到 3000）
+bun run dev            # 后端热重载
 ```
 
 ## Agent 分发
 
 | 渠道 | 目录 | 说明 |
 |------|------|------|
-| Claude Code Plugin | [`plugin/`](plugin/README.md) | 分发 Skill + MCP 配置模板 |
-| OpenClaw Plugin | [`openclaw/`](openclaw/README.md) | 分发 Skill + Gateway MCP 注册 |
+| Claude Code Plugin | [`plugin/`](plugin/README.md) | 分发 Skill，通过 `/plugin install` 安装 |
+| OpenClaw Plugin | [`openclaw/`](openclaw/README.md) | 分发 Skill + OpenClaw 环境变量 |
 
 两个渠道共享 `skills/` 目录下的 Skill 内容，发布时由 CI 复制到各分发目录。
-
-```
-skills/
-├── getting-started/              # 部署服务 + 连接 MCP
-│   └── SKILL.md
-├── deploying-hy2-nodes/          # 部署 Hysteria2 节点
-│   ├── SKILL.md
-│   └── hysteria2-template.md
-├── deploying-xray-nodes/         # 部署 Xray/Trojan 节点
-│   ├── SKILL.md
-│   └── xray-template.md
-└── testing-nodes/                # 节点诊断与测速
-    └── SKILL.md
-```
 
 ## License
 
