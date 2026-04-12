@@ -115,7 +115,7 @@ trafficStats:
 | `{{STREAM_WINDOW}}` | QUIC stream receive window (bytes) | Memory < 4 GB: `8388608` (8 MB). Memory >= 4 GB: `16777216` (16 MB) |
 | `{{CONN_WINDOW}}` | QUIC connection receive window (bytes) | Memory < 4 GB: `20971520` (20 MB). Memory >= 4 GB: `41943040` (40 MB). Must be 2.5x stream window |
 | `{{MAX_STREAMS}}` | Max concurrent QUIC streams | `min(1024, CPU_CORES * 256)` |
-| `{{AUTH_CALLBACK_URL}}` | TunPilot auth callback URL | Returned by the `add_node` MCP tool |
+| `{{AUTH_CALLBACK_URL}}` | TunPilot auth callback URL | Returned by `tunpilot node add` |
 | `{{STATS_PORT}}` | Traffic stats API port | Default: `9999` |
 | `{{STATS_SECRET}}` | Traffic stats API secret | Random hex string, e.g. `openssl rand -hex 16` |
 | `{{BANDWIDTH_UP}}` | Server upload limit (Brutal mode only) | User-provided, e.g. `200 mbps` |

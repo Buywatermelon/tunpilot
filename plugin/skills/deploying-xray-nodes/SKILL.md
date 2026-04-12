@@ -1,6 +1,6 @@
 ---
 name: deploying-xray-nodes
-description: Use when deploying a new Xray-core Trojan proxy node, configuring TLS certificates with certificate pinning, or registering Trojan nodes in TunPilot.
+description: "Deploys TCP Trojan proxy nodes on Xray-core with certbot Let's Encrypt or self-signed EC P-256 + SHA-256 certificate fingerprint pinning, TCP Fast Open kernel tuning with BBR, nginx-compatible fallback site, gRPC user sync (not HTTP auth callback), and systemd hardening with strict filesystem isolation. Use when deploying a Trojan node on Xray, pinning a self-signed cert fingerprint, configuring TCP Fast Open, or setting up the Xray gRPC stats API. Not for Hysteria2 — see deploying-hy2-nodes."
 metadata:
   openclaw:
     requires:
@@ -10,11 +10,18 @@ metadata:
     homepage: https://github.com/Buywatermelon/tunpilot
 ---
 
-# TunPilot Xray-core Node Deployment (Production-Optimized)
+# TunPilot Xray-core Trojan Node Deployment
 
-Deploy a production-grade Xray-core Trojan proxy node with automatic performance tuning, security hardening, and certificate fingerprint pinning. Follow each phase in order.
+Deploy a production-grade Xray-core Trojan proxy node with automatic performance tuning, security hardening, and certificate fingerprint pinning.
 
-**Prerequisite**: TunPilot server must be running and CLI must be configured (use `getting-started` skill if not).
+**Prerequisite:** TunPilot server running and `tunpilot` CLI configured (use `getting-started` skill if not). All TunPilot operations below go through the CLI.
+
+**Auxiliary files (read when referenced below):**
+
+- [xray-template.md](xray-template.md) — config templates (ACME / self-signed variants)
+- [../_shared/DIAG_SETUP.md](../_shared/DIAG_SETUP.md) — diagnostic tooling install
+- [../_shared/SYSTEMD_HARDENING.md](../_shared/SYSTEMD_HARDENING.md) — hardening drop-in template
+- [../_shared/SSH_TROUBLESHOOTING.md](../_shared/SSH_TROUBLESHOOTING.md) — generic SSH/systemd issues
 
 ---
 
@@ -22,59 +29,43 @@ Deploy a production-grade Xray-core Trojan proxy node with automatic performance
 
 ### 1.1 Ask the User
 
-Collect the following from the user:
+- **SSH destination** — e.g. `root@node1.example.com` or SSH config alias
+- **Domain name** (optional) — if none, self-signed + fingerprint pinning will be used
+- **Node name** — human-readable label (e.g. `tokyo-trojan`)
 
-- **SSH destination**: e.g. `root@node1.example.com` or an SSH config alias
-- **Domain name** (optional): A domain pointing to this server's IP. If none, self-signed certs with fingerprint pinning will be used.
-- **Node name**: A human-readable label (e.g. `tokyo-trojan`, `bwg-trojan`)
-
-### 1.2 Test SSH Connectivity
+### 1.2 Test SSH
 
 ```bash
 ssh <server> "echo ok"
 ```
 
-### 1.3 Probe Server Capabilities
-
-Run ALL probes in a single SSH session to minimize round trips:
+### 1.3 Probe Server (single SSH round trip)
 
 ```bash
 ssh <server> bash <<'PROBE'
 echo "=== OS/ARCH ==="
 uname -s -m
 cat /etc/os-release 2>/dev/null | grep -E '^(ID|VERSION_ID)='
-
 echo "=== CPU ==="
 nproc
-
 echo "=== MEMORY ==="
 free -b | awk '/Mem/{print $2}'
-
 echo "=== PORT CONFLICTS ==="
 ss -tulnp | grep -E ':443|:80' || echo "no conflicts"
-
 echo "=== FIREWALL ==="
 if command -v ufw &>/dev/null; then echo "ufw"; ufw status 2>/dev/null
 elif command -v firewall-cmd &>/dev/null; then echo "firewalld"; firewall-cmd --state 2>/dev/null
 elif command -v nft &>/dev/null; then echo "nftables"
 else echo "none"
 fi
-
 echo "=== EXISTING XRAY ==="
 xray version 2>/dev/null || echo "not installed"
-
 echo "=== NETWORK ==="
 ip -4 addr show scope global 2>/dev/null
 ip -6 addr show scope global 2>/dev/null
-
 echo "=== SYSCTL ==="
-sysctl -n net.core.rmem_max 2>/dev/null
-sysctl -n net.core.wmem_max 2>/dev/null
-sysctl -n net.core.somaxconn 2>/dev/null
-sysctl -n net.ipv4.tcp_congestion_control 2>/dev/null
-sysctl -n net.core.default_qdisc 2>/dev/null
-sysctl -n net.ipv4.tcp_fastopen 2>/dev/null
-
+sysctl -n net.core.rmem_max net.core.wmem_max net.core.somaxconn \
+  net.ipv4.tcp_congestion_control net.core.default_qdisc net.ipv4.tcp_fastopen 2>/dev/null
 echo "=== DISK ==="
 df -h / 2>/dev/null
 PROBE
@@ -82,24 +73,20 @@ PROBE
 
 ### 1.4 Build Server Profile
 
-Using the probe results, build a server profile table:
-
 | Parameter | Source | Derived Setting |
 |-----------|--------|-----------------|
 | Memory | `free -b` | TCP buffer sizes (rmem/wmem) |
 | CPU cores | `nproc` | Connection capacity |
-| Port conflicts | `ss -tulnp` | Whether 443/TCP and 80/TCP are available |
-| Firewall type | probe | Which firewall commands to use (ufw/firewall-cmd/iptables/none) |
-| Kernel tuning | sysctl values | Whether TCP sysctl tuning is needed (BBR, somaxconn, fastopen) |
-| Existing Xray | version check | Whether to install fresh or upgrade |
+| Port conflicts | `ss -tulnp` | Whether TCP/443 and TCP/80 are available |
+| Firewall type | probe | ufw / firewall-cmd / manual |
+| Kernel tuning | sysctl | Skip 2.1 if BBR + somaxconn + TFO already set |
+| Existing Xray | version check | Fresh install vs upgrade |
 
-### 1.5 Confirm Choices with User
+### 1.5 Confirm With User
 
-Present the server profile and confirm:
-
-- **TLS strategy**: ACME (requires domain) vs self-signed + fingerprint pinning (no domain needed)
-- **Fallback site**: What to serve on port 80 for non-Trojan traffic (default: install nginx with a basic page, or skip)
-- **gRPC API port**: Default `10085` for Xray stats API
+- **TLS strategy** — ACME (requires domain) vs self-signed + SHA-256 fingerprint pinning
+- **Fallback site** — what to serve on port 80 for non-Trojan traffic (default: skip; nginx can be added later)
+- **gRPC API port** — default `10085`
 
 ---
 
@@ -107,90 +94,52 @@ Present the server profile and confirm:
 
 ### 2.1 Kernel Tuning
 
-Apply TCP-optimized sysctl settings. Skip if the probe shows values are already tuned.
+Skip if probe showed values already tuned.
 
 ```bash
 ssh <server> bash <<'SYSCTL'
 cat > /etc/sysctl.d/99-xray.conf << 'EOF'
-# TCP buffer sizes
 net.core.rmem_max = 16777216
 net.core.wmem_max = 16777216
 net.ipv4.tcp_rmem = 4096 87380 16777216
 net.ipv4.tcp_wmem = 4096 65536 16777216
-
-# Connection backlog
 net.core.somaxconn = 4096
-
-# TCP Fast Open (client + server)
 net.ipv4.tcp_fastopen = 3
-
-# BBR congestion control
 net.core.default_qdisc = fq
 net.ipv4.tcp_congestion_control = bbr
 EOF
-
 sysctl -p /etc/sysctl.d/99-xray.conf
 SYSCTL
 ```
 
 ### 2.2 Install Xray-core
 
-Ensure prerequisites are installed, then install Xray:
-
 ```bash
 ssh <server> 'apt-get update -qq && apt-get install -y -qq unzip curl && bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install'
-```
-
-Verify installation:
-
-```bash
 ssh <server> "xray version"
 ```
 
-### 2.3 Install Diagnostic Dependencies
+### 2.3 Install Diagnostic Tooling
 
-Install tools required by the diagnostic scripts (IPQuality + NetQuality):
-
-```bash
-ssh <server> "apt-get update -qq && apt-get install -y -qq jq curl bc netcat-openbsd dnsutils iproute2 iperf3 mtr"
-```
-
-### 2.3.1 Install Diagnostics Wrapper
-
-Deploy the `tunpilot-diag` script for clean JSON diagnostics output:
-
-```bash
-ssh <server> bash <<'DIAG_INSTALL'
-curl -fsSL https://raw.githubusercontent.com/Buywatermelon/tunpilot/main/scripts/tunpilot-diag.sh \
-  -o /usr/local/bin/tunpilot-diag
-chmod +x /usr/local/bin/tunpilot-diag
-tunpilot-diag --version
-DIAG_INSTALL
-```
+Read [../_shared/DIAG_SETUP.md](../_shared/DIAG_SETUP.md) and run both steps on this server.
 
 ### 2.4 TLS Certificate
 
-**Config A — With domain (ACME via standalone or webroot):**
+**Config A — Domain + certbot standalone:**
 
-Use certbot or acme.sh to obtain a Let's Encrypt certificate independently of Xray. This keeps certificate management separate from the proxy:
+Keep cert management separate from Xray via certbot. Auto-reload Xray on renewal via a post-hook:
 
 ```bash
 ssh <server> bash <<'ACME'
-# Install certbot if not present
 command -v certbot &>/dev/null || apt-get install -y certbot
+ss -tlnp | grep ':80 ' && echo "WARNING: port 80 in use — stop it first" || echo "port 80 available"
 
-# Ensure port 80 is free for HTTP-01 challenge
-ss -tlnp | grep ':80 ' && echo "WARNING: port 80 in use — stop the service first" || echo "port 80 available"
-
-# Obtain certificate (standalone mode — no web server needed)
 certbot certonly --standalone -d {{DOMAIN}} --non-interactive --agree-tos --email admin@{{DOMAIN}}
 
-# Set up auto-renewal with Xray restart
 mkdir -p /etc/xray
 ln -sf /etc/letsencrypt/live/{{DOMAIN}}/fullchain.pem /etc/xray/cert.pem
-ln -sf /etc/letsencrypt/live/{{DOMAIN}}/privkey.pem /etc/xray/key.pem
+ln -sf /etc/letsencrypt/live/{{DOMAIN}}/privkey.pem  /etc/xray/key.pem
 
-# Add post-renewal hook to restart Xray
 cat > /etc/letsencrypt/renewal-hooks/post/restart-xray.sh << 'HOOK'
 #!/bin/bash
 systemctl restart xray
@@ -199,7 +148,7 @@ chmod +x /etc/letsencrypt/renewal-hooks/post/restart-xray.sh
 ACME
 ```
 
-**Config B — Without domain (self-signed EC P-256 + fingerprint pinning):**
+**Config B — Self-signed EC P-256 + SHA-256 fingerprint pinning:**
 
 ```bash
 ssh <server> bash <<'SELFSIGN'
@@ -211,44 +160,39 @@ openssl req -x509 -newkey ec \
   -days 3650 -nodes \
   -subj '/CN=bing.com'
 
-# Calculate SHA-256 fingerprint for certificate pinning
 echo "=== Certificate SHA-256 Fingerprint ==="
 openssl x509 -in /etc/xray/cert.pem -noout -fingerprint -sha256 | sed 's/://g' | cut -d= -f2
 SELFSIGN
 ```
 
-**Save the fingerprint** — it will be used when registering the node in TunPilot and is included in subscription configs for clients to verify the certificate.
+**Save the fingerprint** — used in `add_node` (2.5) and embedded in subscription configs so clients can verify the cert despite self-signed status.
 
 ### 2.5 Register Node in TunPilot
 
-Use the CLI to register the node:
+Run `tunpilot node add`. Note: **Trojan/Xray uses gRPC sync** rather than HTTP auth callback, so the returned `auth_callback_url` is not consumed by the client.
 
 ```bash
 tunpilot node add \
-  --name=<node-name> \
-  --host=<server-ip-or-domain> \
-  --port=443 \
-  --protocol=trojan \
-  --stats_port=10085 \
-  --sni=<domain> \
-  --ssh_user=root \
-  --ssh_port=22 \
-  --insecure=1 \
-  --cert_fingerprint=<sha256-fingerprint>
+  --name <node-name> \
+  --host <server-ip-or-domain> \
+  --port 443 \
+  --protocol trojan \
+  --stats-port 10085 \
+  --sni <domain-or-omit> \
+  --cert-path /etc/xray/cert.pem \
+  --ssh-user root --ssh-port 22 \
+  --insecure <0-if-acme-or-1-if-selfsigned> \
+  --cert-fingerprint <hex-sha256-without-colons>  # Config B only
 ```
 
-Required flags: `--name`, `--host`, `--port`, `--protocol`
+### 2.6 Write Xray Config
 
-Optional flags: `--stats_port`, `--sni`, `--cert_path`, `--ssh_user`, `--ssh_port`, `--ssh_alias`, `--insecure` (1 for self-signed, 0 for ACME), `--cert_fingerprint` (Config B only)
+Read [xray-template.md](xray-template.md) and pick:
 
-### 2.6 Write Xray JSON Config
+- **Config A (ACME)** — cert paths point to Let's Encrypt symlinks
+- **Config B (Self-signed)** — cert paths point to `/etc/xray/*.pem` directly
 
-Read the config template from `xray-template.md` in this skill directory. Choose the appropriate config variant:
-
-- **Config A (ACME / with domain)**: Certificate paths point to Let's Encrypt symlinks
-- **Config B (Self-signed / no domain)**: Certificate paths point to self-signed certs
-
-Fill all placeholders using values from the server profile. Write the config:
+Fill placeholders, then:
 
 ```bash
 ssh <server> "cat > /usr/local/etc/xray/config.json << 'CONF'
@@ -258,42 +202,26 @@ CONF"
 
 ### 2.7 Systemd Hardening
 
-Create a systemd drop-in to harden the Xray service:
+Read [../_shared/SYSTEMD_HARDENING.md](../_shared/SYSTEMD_HARDENING.md) and apply with:
 
-```bash
-ssh <server> bash <<'SYSTEMD'
-mkdir -p /etc/systemd/system/xray.service.d
-
-cat > /etc/systemd/system/xray.service.d/hardening.conf << 'EOF'
-[Service]
-LimitNOFILE=65536
-NoNewPrivileges=true
-ProtectSystem=strict
-ProtectHome=true
-PrivateTmp=true
-ReadWritePaths=/usr/local/etc/xray /etc/xray /var/log/xray
-EOF
-
-systemctl daemon-reload
-SYSTEMD
-```
+- `{{SERVICE}}` = `xray`
+- `{{READ_WRITE_PATHS}}` = `/usr/local/etc/xray /etc/xray /var/log/xray`
+- `{{CAPABILITIES}}` — omit both `AmbientCapabilities` and `CapabilityBoundingSet` lines; Xray runs as root and does not need them.
 
 ### 2.8 Firewall
 
-Open required ports using the firewall type detected in Phase 1.3. Trojan uses TCP (not UDP like Hysteria2):
+Trojan is TCP-only (unlike Hysteria2 which is UDP):
 
 ```bash
 ssh <server> bash <<'FIREWALL'
 if command -v ufw &>/dev/null; then
-  ufw allow 443/tcp
-  ufw allow 80/tcp
-  ufw reload
+  ufw allow 443/tcp && ufw allow 80/tcp && ufw reload
 elif command -v firewall-cmd &>/dev/null; then
   firewall-cmd --permanent --add-port=443/tcp
   firewall-cmd --permanent --add-port=80/tcp
   firewall-cmd --reload
 else
-  echo "No firewall manager detected — ensure TCP/443 and TCP/80 are open at the provider level"
+  echo "No firewall manager — ensure TCP/443 and TCP/80 are open at provider level"
 fi
 FIREWALL
 ```
@@ -304,17 +232,13 @@ FIREWALL
 ssh <server> "systemctl enable --now xray && sleep 2 && systemctl is-active xray"
 ```
 
-If the service fails to start, check logs immediately:
+If inactive:
 
 ```bash
 ssh <server> "journalctl -u xray --no-pager -n 50"
 ```
 
-After the service is running, sync users to the node:
-
-```bash
-tunpilot node sync
-```
+Once running, run `tunpilot node sync` to push all assigned users to the node via gRPC. Unlike Hysteria2, Xray needs an explicit sync because it does not authenticate via HTTP callback.
 
 ---
 
@@ -322,43 +246,21 @@ tunpilot node sync
 
 ### 3.1 Health Check
 
-Use the CLI to check node health:
-
 ```bash
-tunpilot health
+tunpilot health <node-id>
 ```
 
-### 3.2 gRPC API Connectivity Test
-
-Test the Xray gRPC stats API from the node itself via SSH:
+### 3.2 gRPC API
 
 ```bash
-ssh <server> "xray api statsquery --server=127.0.0.1:{{API_PORT}}"
+ssh <server> "xray api statsquery --server=127.0.0.1:10085"
 ```
 
-This should return stats output (may be empty if no traffic yet).
+Returns stats (possibly empty if no traffic yet). If the command errors, verify the `api` block in the Xray config and that `10085` is listening.
 
-### 3.3 Log Check
+### 3.3 Deployment Summary
 
-Review recent logs for any errors or warnings:
-
-```bash
-ssh <server> "journalctl -u xray --no-pager -n 30 --since '5 minutes ago'"
-```
-
-### 3.4 Deployment Summary
-
-Present a final report to the user:
-
-- Node name and ID
-- Server IP and domain (if any)
-- Protocol (Trojan) and port
-- TLS type (ACME or self-signed with fingerprint)
-- Certificate fingerprint (if self-signed)
-- gRPC API port
-- Kernel tuning applied
-- Health check result
-- Subscription instructions (use `tunpilot user update <id> --nodes=<node-id>` to grant users access, then `tunpilot node sync` to push users)
+Report to user: node name and ID, server IP/domain, protocol (Trojan) and port, TLS type, certificate fingerprint (if self-signed), gRPC API port, kernel tuning status, health check result, and subscription instructions (`tunpilot user update <user-id> --nodes <node-id>,…` to grant access, then `tunpilot node sync` to push users).
 
 ---
 
@@ -366,26 +268,28 @@ Present a final report to the user:
 
 | Symptom | Diagnosis | Fix |
 |---------|-----------|-----|
-| `tunpilot health` unreachable | gRPC API not accessible | Verify `stats_port` matches Xray config `api.listen` port, check SSH connectivity |
-| Service won't start | Config syntax error | Run `journalctl -u xray --no-pager -n 50` and validate JSON syntax with `xray run -test -c /usr/local/etc/xray/config.json` |
-| ACME cert fails | DNS not pointing to server | Check `dig <domain>`, ensure port 80 is open and not occupied |
-| Clients can't connect | Firewall blocking TCP/443 | Check `ss -tlnp | grep 443`, test with `nc -z <ip> 443` |
-| gRPC sync fails | Xray API not listening | Verify `api` block in config, check `ss -tlnp | grep {{API_PORT}}` |
-| Auth failures | Users not synced | Run `tunpilot node sync` to push users to the node |
-| Certificate pinning errors | Fingerprint mismatch | Re-extract fingerprint: `openssl x509 -in /etc/xray/cert.pem -noout -fingerprint -sha256` and update via `tunpilot node update <id> --cert_fingerprint=...` |
+| `tunpilot health` shows unreachable | gRPC API not accessible | Verify `stats_port` matches Xray `api.listen`; check SSH connectivity |
+| Service won't start | Config syntax error | `xray run -test -c /usr/local/etc/xray/config.json` validates JSON; then `journalctl -u xray --no-pager -n 50` |
+| ACME cert fails | DNS misconfig or port 80 occupied | `dig <domain>`; `ss -tlnp \| grep ':80 '` |
+| Clients can't connect | Firewall blocking TCP/443 | `ss -tlnp \| grep 443`; test with `nc -z <ip> 443` |
+| gRPC sync fails | Xray API not listening | Verify `api` block; `ss -tlnp \| grep 10085` |
+| Users authenticate but get no quota | Users not synced after assign | Run `tunpilot node sync` |
+| Certificate pinning errors | Fingerprint mismatch | Re-extract: `openssl x509 -in /etc/xray/cert.pem -noout -fingerprint -sha256` and update via `tunpilot node update <id> --cert-fingerprint <hex>` |
+
+For generic SSH / systemd issues, see [../_shared/SSH_TROUBLESHOOTING.md](../_shared/SSH_TROUBLESHOOTING.md).
 
 ---
 
-## CLI Commands Reference
+## CLI Reference
 
 | Command | Use When |
 |---------|----------|
 | `tunpilot node list` | See all registered nodes |
-| `tunpilot node add --name=... --host=... --port=... --protocol=trojan` | Register a new node (Phase 2.5) |
-| `tunpilot node update <id> --name=...` | Change node config (port, SNI, fingerprint, enable/disable) |
+| `tunpilot node add --protocol trojan …` | Register a new node (Phase 2.5) |
+| `tunpilot node update <id> …` | Change node config (port, SNI, fingerprint, enable/disable) |
 | `tunpilot node remove <id>` | Delete a node (cascades user assignments) |
-| `tunpilot node sync` | Push users to all nodes via gRPC (Phase 2.9) |
-| `tunpilot health` | Verify all nodes are reachable |
-| `tunpilot traffic --node=<id>` | Query traffic usage by node |
-| `tunpilot user update <id> --nodes=<id1>,<id2>` | Grant a user access to specific nodes |
-| `tunpilot sub create --user=<id> --format=surge` | Generate client subscription link for a user |
+| `tunpilot health [<id>]` | Verify node reachability |
+| `tunpilot node sync` | Push users to Trojan nodes via gRPC (Phase 2.9) |
+| `tunpilot traffic --node <id>` | Query traffic usage |
+| `tunpilot user update <id> --nodes <node-id>,…` | Grant a user access to specific nodes |
+| `tunpilot sub create --user <id> --format <format>` | Generate a subscription link |
