@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom"
 import { useAuth } from "@/hooks/use-auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
 
 export default function LoginPage() {
   const [token, setToken] = useState("")
@@ -16,63 +15,62 @@ export default function LoginPage() {
     e.preventDefault()
     setError("")
     setLoading(true)
-
     try {
       await login(token)
       navigate("/")
     } catch {
-      setError("Invalid token. Please check and try again.")
+      setError("令牌无效，请检查后重试。")
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <h1 className="font-heading text-3xl font-bold text-text-primary tracking-tight mb-2">
+    <div className="min-h-screen grid place-items-center bg-parchment px-6">
+      <div className="w-full max-w-[420px]">
+        <div className="text-center mb-10">
+          <div className="font-serif text-[52px] font-medium leading-[1.10] tracking-[-0.015em] text-ink">
             TunPilot
-          </h1>
-          <p className="text-text-secondary text-sm">
-            Sign in to manage your proxy nodes
+          </div>
+          <p className="mt-4 text-[17px] text-olive leading-[1.6]">
+            为你的代理节点打造的安静后台。
           </p>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Authentication</CardTitle>
-            <CardDescription>Enter your API token to continue</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <label
-                  htmlFor="token"
-                  className="text-sm font-medium text-text-primary"
-                >
-                  API Token
-                </label>
-                <Input
-                  id="token"
-                  type="password"
-                  placeholder="Enter your token"
-                  value={token}
-                  onChange={(e) => setToken(e.target.value)}
-                  required
-                />
-              </div>
+        <div className="rounded-[16px] bg-ivory border border-border-cream shadow-whisper p-8">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+            <div className="flex flex-col gap-2">
+              <label
+                htmlFor="token"
+                className="text-[11px] font-medium uppercase tracking-[0.2em] text-olive"
+              >
+                API 令牌
+              </label>
+              <Input
+                id="token"
+                type="password"
+                placeholder="粘贴你的令牌"
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                autoFocus
+                required
+              />
+              {error && <p className="text-[13px] text-error mt-1">{error}</p>}
+            </div>
 
-              {error && (
-                <p className="text-sm text-danger">{error}</p>
-              )}
+            <Button type="submit" size="lg" disabled={loading || !token}>
+              {loading ? "验证中…" : "继续"}
+            </Button>
+          </form>
+        </div>
 
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Verifying..." : "Sign in"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+        <p className="mt-6 text-center text-[13px] text-olive leading-[1.6]">
+          在服务器设置{" "}
+          <code className="font-mono text-[12px] text-ink-muted bg-sand/70 px-1.5 py-0.5 rounded">
+            TUNPILOT_AUTH_TOKEN
+          </code>{" "}
+          即可轮换令牌。
+        </p>
       </div>
     </div>
   )

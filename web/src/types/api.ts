@@ -1,12 +1,12 @@
 export interface User {
   id: string
   name: string
-  email: string
-  status: "active" | "disabled"
-  trafficLimit: number
-  trafficUsed: number
-  expiresAt: string
-  createdAt: string
+  quota_bytes: number
+  used_bytes: number
+  expires_at: string | null
+  max_devices: number
+  enabled: number
+  created_at: string
 }
 
 export interface Node {
@@ -15,6 +15,28 @@ export interface Node {
   host: string
   port: number
   protocol: string
-  status: string
-  createdAt: string
+  enabled: number
+  created_at: string
+}
+
+export interface Subscription {
+  id: string
+  user_id: string
+  token: string
+  format: string
+  created_at: string
+}
+
+export interface NodeHealth {
+  id: string
+  name: string
+  status: "online" | "offline" | "degraded" | "disabled" | "unknown" | string
+}
+
+export interface HealthResponse {
+  nodes: NodeHealth[]
+}
+
+export interface InfoResponse {
+  base_url: string
 }

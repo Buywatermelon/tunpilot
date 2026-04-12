@@ -16,3 +16,14 @@ export function formatBytes(bytes: unknown, decimals = 2): string {
 
   return `${parseFloat((n / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`
 }
+
+export function formatNumber(n: number): string {
+  return new Intl.NumberFormat("en-US").format(n)
+}
+
+export function formatDate(iso?: string | null): string {
+  if (!iso) return "—"
+  const d = new Date(iso.replace(" ", "T"))
+  if (Number.isNaN(d.getTime())) return "—"
+  return d.toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" })
+}
