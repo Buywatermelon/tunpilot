@@ -1,25 +1,20 @@
-// OpenClaw 插件入口：向 Gateway 注册 TunPilot MCP 连接
-// 用户通过 OpenClaw 配置 UI 填写 tunpilotUrl 和 mcpToken
+// OpenClaw 插件入口：将 TunPilot 服务地址与认证令牌暴露给 Skill 环境。
+// 用户在 OpenClaw 配置界面填写 tunpilotUrl 和 authToken，
+// Skill 通过 TUNPILOT_URL / TUNPILOT_AUTH_TOKEN 读取。
 export default function register(api: any) {
   const config = api.getConfig();
 
   api.registerService({
-    id: "tunpilot-mcp",
+    id: "tunpilot-env",
     start: () => {
-      api.registerMcpServer({
-        id: "tunpilot",
-        transport: {
-          type: "http",
-          url: `${config.tunpilotUrl}/mcp`,
-          headers: {
-            Authorization: `Bearer ${config.mcpToken}`,
-          },
-        },
+      api.setSkillEnv?.({
+        TUNPILOT_URL: config.tunpilotUrl,
+        TUNPILOT_AUTH_TOKEN: config.authToken,
       });
-      api.logger.info(`TunPilot MCP connected: ${config.tunpilotUrl}`);
+      api.logger.info(`TunPilot env exported: ${config.tunpilotUrl}`);
     },
     stop: () => {
-      api.logger.info("TunPilot MCP disconnected");
+      api.logger.info("TunPilot env cleared");
     },
   });
 }

@@ -1,8 +1,8 @@
 {
   "name": "tunpilot",
   "description": "Agent-native proxy node management with Hysteria2 & Xray/Trojan deployment guides",
-  "version": "0.3.0",
+  "version": "0.5.0",
   "homepage": "https://github.com/Buywatermelon/tunpilot",
   "license": "MIT",
-  "keywords": ["proxy", "hysteria2", "vpn", "mcp"]
+  "keywords": ["proxy", "hysteria2", "xray", "trojan", "vpn", "admin", "cli"]
 }

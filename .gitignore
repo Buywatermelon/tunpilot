@@ -11,3 +11,4 @@ data/
 
 # Forge
 .forge
+.claude/skills/
