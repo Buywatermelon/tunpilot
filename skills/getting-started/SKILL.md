@@ -1,6 +1,6 @@
 ---
 name: getting-started
-description: Use when the user wants to deploy TunPilot server, connect MCP to Claude Code, update an existing installation, or set up TunPilot for the first time.
+description: "Deploys TunPilot server via SSH, configures MCP connection in Claude Code, and verifies end-to-end connectivity. Use when installing TunPilot, deploying the server, connecting MCP to Claude Code, configuring remote access, updating an existing installation, or setting up TunPilot for the first time."
 metadata:
   openclaw:
     requires:
@@ -162,11 +162,4 @@ Restricts port 3000 to only your IP address.
 
 ## What's Next
 
-After connecting, the user has 20 MCP tools across 5 categories:
-- **Nodes** (4): list_nodes, add_node, update_node, remove_node
-- **Users** (7): list_users, create_user, update_user, delete_user, reset_traffic, assign_nodes, list_user_nodes
-- **Subscriptions** (4): generate_subscription, list_subscriptions, delete_subscription, get_subscription_config
-- **Monitoring** (2): check_health, get_traffic_stats
-- **Settings** (3): set_setting, list_settings, delete_setting
-
-Next step: deploy proxy nodes using the `deploying-hy2-nodes` (Hysteria2) or `deploying-xray-nodes` (Trojan) skill.
+After connecting, 20 MCP tools are available across nodes, users, subscriptions, monitoring, and settings. Deploy proxy nodes using the `deploying-hy2-nodes` (Hysteria2) or `deploying-xray-nodes` (Trojan) skill.

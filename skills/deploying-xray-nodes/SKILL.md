@@ -1,6 +1,6 @@
 ---
 name: deploying-xray-nodes
-description: Use when deploying a new Xray-core Trojan proxy node, configuring TLS certificates with certificate pinning, or registering Trojan nodes in TunPilot.
+description: "Deploys and configures Xray-core Trojan proxy nodes with TLS certificate pinning, TCP kernel tuning, and systemd hardening, then registers them in TunPilot. Use when deploying a new Xray-core Trojan node, configuring TLS with certificate fingerprint pinning, setting up TCP performance tuning, or registering Trojan nodes in TunPilot."
 metadata:
   openclaw:
     requires:
@@ -172,7 +172,7 @@ DIAG_INSTALL
 
 **Config A — With domain (ACME via standalone or webroot):**
 
-Use certbot or acme.sh to obtain a Let's Encrypt certificate independently of Xray. This keeps certificate management separate from the proxy:
+Use certbot to obtain a Let's Encrypt certificate independently of Xray:
 
 ```bash
 ssh <server> bash <<'ACME'
@@ -221,7 +221,7 @@ SELFSIGN
 
 ### 2.5 Register Node in TunPilot
 
-Use the `add_node` MCP tool. This returns the `auth_callback_url` (though Trojan/Xray uses gRPC sync rather than HTTP auth callback).
+Use the `add_node` MCP tool. Note: Trojan/Xray uses gRPC sync rather than HTTP auth callback, so the returned `auth_callback_url` is not used by the client.
 
 Required parameters:
 
