@@ -22,6 +22,8 @@ export function createApiApp(db: Db, baseUrl: string): Hono {
     });
   }
 
+  app.get("/info", (c) => c.json({ base_url: baseUrl }));
+
   app.route("/nodes", createNodeRoutes(db));
   app.route("/users", createUserRoutes(db, baseUrl));
   app.route("/subscriptions", createSubscriptionRoutes(db));

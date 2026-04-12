@@ -1,6 +1,9 @@
 {
   "name": "tunpilot",
   "module": "src/index.ts",
+  "bin": {
+    "tunpilot": "./cli/index.ts"
+  },
   "scripts": {
     "dev": "bun --hot src/index.ts",
     "start": "bun src/index.ts",
@@ -13,7 +16,7 @@
   "dependencies": {
     "@grpc/grpc-js": "^1.14.3",
     "@grpc/proto-loader": "^0.8.0",
-"drizzle-orm": "^0.45.1",
+    "drizzle-orm": "^0.45.1",
     "hono": "^4",
     "yaml": "^2.8.1"
   },
