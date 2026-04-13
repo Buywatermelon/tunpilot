@@ -159,7 +159,19 @@ function CopyableUrl({ url }: { url: string }) {
   const [copied, setCopied] = useState(false)
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(url)
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(url)
+      } else {
+        // Fallback for HTTP (non-secure) contexts
+        const textarea = document.createElement("textarea")
+        textarea.value = url
+        textarea.style.position = "fixed"
+        textarea.style.opacity = "0"
+        document.body.appendChild(textarea)
+        textarea.select()
+        document.execCommand("copy")
+        document.body.removeChild(textarea)
+      }
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1600)
     } catch {
