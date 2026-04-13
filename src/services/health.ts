@@ -1,11 +1,41 @@
 import type { Db } from "../db/index";
 import { listNodes } from "./node";
 import { pingHysteriaStats } from "./hysteria/stats";
+import { needsTunnel, ensureTunnel } from "./xray/tunnel";
 
 export interface NodeHealthStatus {
   id: string;
   name: string;
   status: string;
+}
+
+/** Check if a TCP port accepts connections. */
+async function tcpPing(host: string, port: number, timeoutMs = 5_000): Promise<boolean> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(false), timeoutMs);
+    try {
+      const socket = Bun.connect({
+        hostname: host,
+        port,
+        socket: {
+          open(socket) {
+            clearTimeout(timer);
+            socket.end();
+            resolve(true);
+          },
+          data() {},
+          close() {},
+          error() {
+            clearTimeout(timer);
+            resolve(false);
+          },
+        },
+      });
+    } catch {
+      clearTimeout(timer);
+      resolve(false);
+    }
+  });
 }
 
 export async function getNodeHealthStatuses(db: Db): Promise<NodeHealthStatus[]> {
@@ -22,13 +52,20 @@ export async function getNodeHealthStatuses(db: Db): Promise<NodeHealthStatus[]>
         return { id: node.id, name: node.name, status };
       }
 
-      // Xray/trojan nodes: attempt gRPC stats ping
+      // Xray/trojan nodes: TCP ping via SSH tunnel (gRPC, not HTTP)
       if ((node.protocol === "trojan" || node.protocol === "xray") && node.stats_port) {
-        const baseUrl = `http://${node.host}:${node.stats_port}`;
-        const status = await fetch(baseUrl, { signal: AbortSignal.timeout(5_000) })
-          .then(() => "online")
-          .catch(() => "offline");
-        return { id: node.id, name: node.name, status };
+        try {
+          let host = node.host;
+          let port = node.stats_port;
+          if (needsTunnel(node)) {
+            port = await ensureTunnel(node);
+            host = "127.0.0.1";
+          }
+          const online = await tcpPing(host, port);
+          return { id: node.id, name: node.name, status: online ? "online" : "offline" };
+        } catch {
+          return { id: node.id, name: node.name, status: "offline" };
+        }
       }
 
       return { id: node.id, name: node.name, status: "unknown" };
