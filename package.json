@@ -5,7 +5,7 @@
     "tunpilot": "./cli/index.ts"
   },
   "scripts": {
-    "dev": "bun --hot src/index.ts",
+    "dev": "RECONCILE_INTERVAL=0 TRAFFIC_SYNC_INTERVAL=0 bun --hot src/index.ts",
     "start": "bun src/index.ts",
     "test": "bun test",
     "db:push": "drizzle-kit push",

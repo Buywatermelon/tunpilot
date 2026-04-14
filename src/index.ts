@@ -38,27 +38,33 @@ app.get("/*", async (c) => {
 });
 
 // 启动流量同步
-const syncTimer = startTrafficSync(db, config.trafficSyncInterval);
+let syncTimer: ReturnType<typeof setInterval> | undefined;
+if (config.trafficSyncInterval > 0) {
+  syncTimer = startTrafficSync(db, config.trafficSyncInterval);
+}
 
 // 流量日志清理
 cleanupOldTrafficLogs(db, config.retentionDays);
 const retentionTimer = setInterval(() => cleanupOldTrafficLogs(db, config.retentionDays), 24 * 60 * 60 * 1000);
 
 // 节点对账
-reconcileAllXrayNodes(db).catch((err) => {
-  console.error("Initial Xray reconciliation failed:", err);
-});
-reconcileAllHysteriaNodes(db).catch((err) => {
-  console.error("Initial Hysteria reconciliation failed:", err);
-});
-const reconcileTimer = setInterval(() => {
+let reconcileTimer: ReturnType<typeof setInterval> | undefined;
+if (config.reconcileInterval > 0) {
   reconcileAllXrayNodes(db).catch((err) => {
-    console.error("Xray reconciliation failed:", err);
+    console.error("Initial Xray reconciliation failed:", err);
   });
   reconcileAllHysteriaNodes(db).catch((err) => {
-    console.error("Hysteria reconciliation failed:", err);
+    console.error("Initial Hysteria reconciliation failed:", err);
   });
-}, config.reconcileInterval);
+  reconcileTimer = setInterval(() => {
+    reconcileAllXrayNodes(db).catch((err) => {
+      console.error("Xray reconciliation failed:", err);
+    });
+    reconcileAllHysteriaNodes(db).catch((err) => {
+      console.error("Hysteria reconciliation failed:", err);
+    });
+  }, config.reconcileInterval);
+}
 
 // 启动服务器
 const server = Bun.serve({
@@ -71,14 +77,15 @@ const server = Bun.serve({
 console.log(`TunPilot running on ${config.host}:${config.port}`);
 console.log(`  HTTP endpoints: /health, /sub/:token`);
 console.log(`  API endpoints: /api/v1/*`);
-console.log(`  Traffic sync interval: ${config.trafficSyncInterval / 1000}s`);
+console.log(`  Traffic sync: ${config.trafficSyncInterval > 0 ? `${config.trafficSyncInterval / 1000}s` : "disabled"}`);
+console.log(`  Reconcile: ${config.reconcileInterval > 0 ? `${config.reconcileInterval / 1000}s` : "disabled"}`);
 
 // 优雅关闭
 function shutdown() {
   console.log("Shutting down...");
-  clearInterval(syncTimer);
+  if (syncTimer) clearInterval(syncTimer);
   clearInterval(retentionTimer);
-  clearInterval(reconcileTimer);
+  if (reconcileTimer) clearInterval(reconcileTimer);
   closeAllXrayClients();
   closeAllTunnels();
   server.stop();
