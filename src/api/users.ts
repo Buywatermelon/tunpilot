@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { listUsers, createUser, getUser, getUserNodes } from "../services/user";
+import { listUsers, createUser, getUser, getUserNodes, assignNodesToUser } from "../services/user";
 import {
   updateUserWithSync,
   deleteUserWithSync,
@@ -7,9 +7,11 @@ import {
   assignNodesWithSync,
   addNodeWithSync,
   removeNodeWithSync,
+  syncNodesByIds,
 } from "../services/user-ops";
 import { listNodes } from "../services/node";
 import { generateSubscription, listSubscriptions } from "../services/subscription";
+import { parseSqliteConstraintError } from "../lib/errors";
 
 type Db = Parameters<typeof listUsers>[0];
 
@@ -23,24 +25,40 @@ export function createUserRoutes(db: Db, baseUrl: string): Hono {
   app.post("/", async (c) => {
     const body = await c.req.json();
     const { nodes: nodesParam, subscribe, ...userParams } = body;
-    const user = createUser(db, userParams);
+
+    let user;
+    try {
+      user = createUser(db, userParams);
+    } catch (err: unknown) {
+      const constraint = parseSqliteConstraintError(err);
+      if (constraint) return c.json({ error: constraint }, 409);
+      throw err;
+    }
 
     if (!nodesParam && !subscribe) {
       return c.json(user, 201);
     }
 
+    // DB node assignment (fast), then respond immediately
     let assignedNodeIds: string[] = [];
     if (nodesParam) {
       const nodeIds = nodesParam === "all"
         ? listNodes(db).map((n) => n.id)
         : nodesParam as string[];
-      await assignNodesWithSync(db, user.id, nodeIds);
+      assignNodesToUser(db, user.id, nodeIds);
       assignedNodeIds = nodeIds;
     }
 
     let subscription;
     if (subscribe) {
       subscription = generateSubscription(db, user.id, subscribe, baseUrl);
+    }
+
+    // Fire-and-forget: sync to nodes in background (don't block response)
+    if (assignedNodeIds.length > 0) {
+      syncNodesByIds(db, assignedNodeIds).catch((err) =>
+        console.warn(`Background sync errors for new user ${user.id}:`, err)
+      );
     }
 
     return c.json({ user, nodes: assignedNodeIds, subscription }, 201);

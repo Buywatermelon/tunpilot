@@ -1,4 +1,5 @@
 const BASE_URL = "/api/v1"
+const REQUEST_TIMEOUT_MS = 15_000
 
 function getToken(): string | null {
   return localStorage.getItem("token")
@@ -16,14 +17,29 @@ export class ApiError extends Error {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getToken()
-  const res = await fetch(`${BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token && { Authorization: `Bearer ${token}` }),
-      ...init?.headers,
-    },
-  })
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+
+  let res: Response
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      ...init,
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token && { Authorization: `Bearer ${token}` }),
+        ...init?.headers,
+      },
+    })
+  } catch (err) {
+    clearTimeout(timer)
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new ApiError(0, "请求超时，请稍后重试")
+    }
+    throw new ApiError(0, "网络错误，请检查连接")
+  } finally {
+    clearTimeout(timer)
+  }
 
   if (res.status === 401) {
     localStorage.removeItem("token")

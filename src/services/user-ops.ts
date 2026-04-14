@@ -23,7 +23,7 @@ async function syncUserToAllNodes(db: Db, userId: string): Promise<SyncError[]> 
 }
 
 /** Deploy config to specific nodes, routing by protocol. Each sync function filters internally. */
-async function syncNodesByIds(db: Db, nodeIds: string[]): Promise<SyncError[]> {
+export async function syncNodesByIds(db: Db, nodeIds: string[]): Promise<SyncError[]> {
   if (nodeIds.length === 0) return [];
   const [xrayErrors, hy2Errors] = await Promise.all([
     syncTrojanNodes(db, nodeIds),

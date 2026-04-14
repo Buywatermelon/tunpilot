@@ -6,10 +6,22 @@ import { createUserRoutes } from "./users";
 import { createSubscriptionRoutes } from "./subscriptions";
 import { createMonitoringRoutes } from "./monitoring";
 import { createSettingRoutes } from "./settings";
+import { parseSqliteConstraintError } from "../lib/errors";
 
 export function createApiApp(db: Db, baseUrl: string): Hono {
   const app = new Hono();
   const { authToken } = getConfig();
+
+  // Access log middleware
+  app.use("*", async (c, next) => {
+    const start = Date.now();
+    await next();
+    const ms = Date.now() - start;
+    const status = c.res.status;
+    if (status >= 400) {
+      console.log(`${c.req.method} ${c.req.path} ${status} ${ms}ms`);
+    }
+  });
 
   // Token auth middleware
   if (authToken) {
@@ -32,6 +44,9 @@ export function createApiApp(db: Db, baseUrl: string): Hono {
 
   // Global error handler
   app.onError((err, c) => {
+    const constraint = parseSqliteConstraintError(err);
+    if (constraint) return c.json({ error: constraint }, 409);
+
     console.error("API error:", err);
     return c.json({ error: "Internal Server Error" }, 500);
   });
