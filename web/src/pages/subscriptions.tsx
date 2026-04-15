@@ -15,7 +15,7 @@ import { PageHeader } from "@/components/ui/page-header"
 import type { Subscription, User, InfoResponse } from "@/types/api"
 
 const FORMATS = [
-  { value: "sing-box", label: "sing-box" },
+  { value: "singbox", label: "sing-box" },
   { value: "clash", label: "Clash" },
   { value: "surge", label: "Surge" },
   { value: "shadowrocket", label: "Shadowrocket" },
@@ -206,7 +206,7 @@ function CreateSubscriptionDialog({
 }) {
   const qc = useQueryClient()
   const [userId, setUserId] = useState(users[0]?.id ?? "")
-  const [format, setFormat] = useState<(typeof FORMATS)[number]["value"]>("sing-box")
+  const [format, setFormat] = useState<(typeof FORMATS)[number]["value"]>("singbox")
   const [error, setError] = useState("")
 
   const mutation = useMutation({
