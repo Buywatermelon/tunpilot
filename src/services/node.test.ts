@@ -141,4 +141,18 @@ describe("removeNode", () => {
     const after = db.$client.query("SELECT * FROM user_nodes WHERE node_id = ?").all(node.id);
     expect(after).toHaveLength(0);
   });
+
+  test("级联删除 traffic_logs（防止 FK 约束阻塞删除）", () => {
+    const node = addNode(db, { name: "node-1", host: "1.1.1.1", port: 443, protocol: "hysteria2" });
+    db.$client.run("INSERT INTO users (id, name, password) VALUES ('u1', 'testuser', 'pass')");
+    db.$client.run(
+      "INSERT INTO traffic_logs (user_id, node_id, tx_bytes, rx_bytes) VALUES ('u1', ?, 100, 200)",
+      [node.id]
+    );
+
+    expect(() => removeNode(db, node.id)).not.toThrow();
+    expect(getNode(db, node.id)).toBeNull();
+    const logs = db.$client.query("SELECT * FROM traffic_logs WHERE node_id = ?").all(node.id);
+    expect(logs).toHaveLength(0);
+  });
 });

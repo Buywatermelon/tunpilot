@@ -59,8 +59,8 @@ export const subscriptions = sqliteTable("subscriptions", {
 // 流量日志表
 export const trafficLogs = sqliteTable("traffic_logs", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  user_id: text("user_id").references(() => users.id),
-  node_id: text("node_id").references(() => nodes.id),
+  user_id: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+  node_id: text("node_id").references(() => nodes.id, { onDelete: "cascade" }),
   tx_bytes: integer("tx_bytes").default(0),
   rx_bytes: integer("rx_bytes").default(0),
   recorded_at: text("recorded_at").default(sql`(datetime('now'))`),

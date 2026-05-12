@@ -68,13 +68,17 @@ export function initDatabase(path: string): Db {
   sqlite.run(`
     CREATE TABLE IF NOT EXISTS traffic_logs (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id       TEXT REFERENCES users(id),
-      node_id       TEXT REFERENCES nodes(id),
+      user_id       TEXT REFERENCES users(id) ON DELETE CASCADE,
+      node_id       TEXT REFERENCES nodes(id) ON DELETE CASCADE,
       tx_bytes      INTEGER DEFAULT 0,
       rx_bytes      INTEGER DEFAULT 0,
       recorded_at   TEXT DEFAULT (datetime('now'))
     )
   `);
+
+  // 迁移旧库：traffic_logs 原本未声明 ON DELETE CASCADE，
+  // 导致删除拥有流量日志的节点/用户时触发 FK 约束失败。
+  migrateTrafficLogsCascade(sqlite);
 
   sqlite.run(`
     CREATE TABLE IF NOT EXISTS settings (
@@ -89,4 +93,35 @@ export function initDatabase(path: string): Db {
   sqlite.run(`CREATE INDEX IF NOT EXISTS idx_traffic_logs_user_node ON traffic_logs(user_id, node_id)`);
 
   return drizzle(sqlite, { schema });
+}
+
+function migrateTrafficLogsCascade(sqlite: Database): void {
+  const row = sqlite
+    .query("SELECT sql FROM sqlite_master WHERE type='table' AND name='traffic_logs'")
+    .get() as { sql: string } | null;
+  if (!row || /ON DELETE CASCADE/i.test(row.sql)) return;
+
+  sqlite.run("PRAGMA foreign_keys = OFF");
+  try {
+    sqlite.transaction(() => {
+      sqlite.run(`
+        CREATE TABLE traffic_logs_new (
+          id            INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id       TEXT REFERENCES users(id) ON DELETE CASCADE,
+          node_id       TEXT REFERENCES nodes(id) ON DELETE CASCADE,
+          tx_bytes      INTEGER DEFAULT 0,
+          rx_bytes      INTEGER DEFAULT 0,
+          recorded_at   TEXT DEFAULT (datetime('now'))
+        )
+      `);
+      sqlite.run(
+        "INSERT INTO traffic_logs_new (id, user_id, node_id, tx_bytes, rx_bytes, recorded_at) " +
+          "SELECT id, user_id, node_id, tx_bytes, rx_bytes, recorded_at FROM traffic_logs"
+      );
+      sqlite.run("DROP TABLE traffic_logs");
+      sqlite.run("ALTER TABLE traffic_logs_new RENAME TO traffic_logs");
+    })();
+  } finally {
+    sqlite.run("PRAGMA foreign_keys = ON");
+  }
 }
